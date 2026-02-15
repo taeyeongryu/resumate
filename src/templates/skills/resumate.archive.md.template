@@ -1,0 +1,53 @@
+---
+description: Convert refined entry to final structured format
+---
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+You **MUST** consider the user input before proceeding (if not empty).
+
+## Outline
+
+This skill converts a refined in-progress experience into the final archived format with YAML frontmatter.
+
+1. **Parse filename argument**:
+   - Extract filename from `$ARGUMENTS`
+   - Support formats: `@filename`, `filename.md`, or just `filename`
+   - Auto-append `.md` if missing
+
+2. **Locate file**:
+   - Look in `.resumate/in-progress/` directory
+   - If not found: "File not found in in-progress/. Did you run `/resumate refine` first?"
+   - If found in `drafts/`: "This draft hasn't been refined yet. Run `/resumate refine @[filename]` first."
+   - If already in `archive/`: "This experience is already archived."
+
+3. **Parse in-progress file**:
+   - Extract original content
+   - Parse all Q&A pairs from "## AI Refinement Questions" section
+   - Extract: Title, Date, Duration, Achievements, Technologies, Learnings, Reflections, Project
+
+4. **Validate required fields**:
+   - Title (must exist)
+   - Date (must be valid ISO date)
+   - Duration (must have start and end dates)
+   - Content (original text must exist)
+
+5. **Generate YAML frontmatter**:
+   - Convert Q&A answers to structured fields
+   - Parse dates to ISO format (YYYY-MM-DD)
+   - Parse lists (technologies, tags, achievements)
+
+6. **Create archived file**:
+   - Write to `.resumate/archive/[filename]`
+   - YAML frontmatter header + markdown body
+
+7. **Remove from in-progress**:
+   - Delete file from `in-progress/` only after successful archive
+
+8. **Confirm success**:
+   - Display extracted fields summary
+   - Show file location

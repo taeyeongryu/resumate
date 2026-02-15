@@ -1,0 +1,54 @@
+---
+description: Create a new experience draft in free-form text
+handoffs:
+  - label: Refine this draft with AI
+    agent: resumate.refine
+    prompt: "Let's refine this draft through conversation"
+    send: true
+---
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+You **MUST** consider the user input before proceeding (if not empty).
+
+## Outline
+
+This skill enables users to capture career experiences in a diary-like, free-form format without worrying about structure or completeness.
+
+1. **Check initialization**: Verify that `.resumate/` directory exists
+   - If not found: ERROR: "Resumate not initialized. Run `resumate init <projectname>` first."
+   - Check for `drafts/`, `in-progress/`, and `archive/` subdirectories
+
+2. **Capture user's experience**:
+   - If `$ARGUMENTS` is provided, use it as the experience content
+   - If empty, prompt the user: "Please write about your experience in free-form text (like a diary entry). Don't worry about structure - just write naturally."
+   - Accept input in any language (Korean, English, mixed)
+
+3. **Generate filename**:
+   - Extract title from first line or first 50 characters
+   - Use current date in `YYYY-MM-DD` format
+   - Create slug from title using lowercase, hyphenated format
+   - Check for duplicate filenames in `drafts/` directory
+   - If duplicate exists, append `-1`, `-2`, etc.
+   - Final format: `YYYY-MM-DD-title-slug.md`
+
+4. **Create draft file**:
+   - Write content to `.resumate/drafts/[filename]`
+   - Include user's free-form text exactly as written
+   - If user provided a title, use `# Title` as first line
+   - Otherwise, auto-generate title from content
+
+5. **Confirm creation**:
+   - Display success message with filename
+   - Show file location: `.resumate/drafts/[filename]`
+   - Suggest next step via handoff button: "Refine this draft with AI"
+
+## Error Handling
+
+- **Not initialized**: "Resumate not initialized. Run `resumate init <projectname>` in your terminal first."
+- **Empty input**: "Please provide some content for your experience."
+- **File write error**: "Failed to create draft file. Please check directory permissions for `.resumate/drafts/`"

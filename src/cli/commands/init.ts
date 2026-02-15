@@ -1,0 +1,74 @@
+import path from 'node:path';
+import { createConfig, SUBDIRECTORIES } from '../../models/config.js';
+import { ensureDirectory, directoryExists, writeFile, readFile } from '../../services/file-manager.js';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const SKILL_TEMPLATES = [
+  'resumate.draft.md.template',
+  'resumate.refine.md.template',
+  'resumate.archive.md.template',
+];
+
+function getTemplatesDir(): string {
+  // In dist: dist/cli/commands/init.js -> we need dist/templates/skills/
+  return path.resolve(__dirname, '..', '..', 'templates', 'skills');
+}
+
+export async function initCommand(projectname: string): Promise<void> {
+  const rootDir = path.resolve(process.cwd(), projectname);
+  const config = createConfig(rootDir);
+
+  if (await directoryExists(config.resumateDir)) {
+    console.error(`Error: .resumate/ already exists in ${rootDir}`);
+    console.error('Resumate is already initialized in this directory.');
+    process.exit(1);
+  }
+
+  try {
+    // Create .resumate/ subdirectories
+    for (const subdir of SUBDIRECTORIES) {
+      await ensureDirectory(path.join(config.resumateDir, subdir));
+    }
+    console.log(`Created .resumate/ directory structure in ${projectname}/`);
+
+    // Install Claude Code skills
+    await installSkills(config.claudeCommandsDir);
+    console.log('Installed Claude Code skill definitions in .claude/commands/');
+
+    console.log('');
+    console.log(`Resumate initialized successfully in ${projectname}/`);
+    console.log('');
+    console.log('Directory structure:');
+    console.log(`  ${projectname}/`);
+    console.log('  └── .resumate/');
+    console.log('      ├── drafts/');
+    console.log('      ├── in-progress/');
+    console.log('      └── archive/');
+    console.log('');
+    console.log('Next steps:');
+    console.log(`  1. cd ${projectname}`);
+    console.log('  2. Open Claude Code: claude');
+    console.log('  3. Create your first draft: /resumate draft');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error initializing Resumate: ${message}`);
+    process.exit(1);
+  }
+}
+
+async function installSkills(commandsDir: string): Promise<void> {
+  await ensureDirectory(commandsDir);
+  const templatesDir = getTemplatesDir();
+
+  for (const templateFile of SKILL_TEMPLATES) {
+    const templatePath = path.join(templatesDir, templateFile);
+    const skillName = templateFile.replace('.template', '');
+    const destPath = path.join(commandsDir, skillName);
+
+    const content = await readFile(templatePath);
+    await writeFile(destPath, content);
+  }
+}

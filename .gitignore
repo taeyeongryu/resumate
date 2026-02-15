@@ -35,3 +35,13 @@ dist/
 build/
 *.egg-info/
 target/
+
+# TypeScript
+*.tsbuildinfo
+
+# Test coverage
+coverage/
+
+# Environment
+.env
+.env.*

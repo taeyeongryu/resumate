@@ -1,0 +1,58 @@
+---
+description: Refine a draft through AI-guided conversation
+handoffs:
+  - label: Archive this experience
+    agent: resumate.archive
+    prompt: "Archive this refined experience to final format"
+    send: true
+---
+
+## User Input
+
+```text
+$ARGUMENTS
+```
+
+You **MUST** consider the user input before proceeding (if not empty).
+
+## Outline
+
+This skill enables AI-guided refinement of draft experiences through conversational Q&A.
+
+1. **Parse filename argument**:
+   - Extract filename from `$ARGUMENTS` (pattern: `@filename` or just `filename`)
+   - Support both formats: `@2024-02-15-example.md` and `2024-02-15-example`
+   - Auto-append `.md` if missing
+
+2. **Locate and read file**:
+   - Check `.resumate/drafts/` directory first (if first-time refinement)
+   - Check `.resumate/in-progress/` directory (if continuing refinement)
+   - If file not found in either: ERROR
+   - If found in `.resumate/archive/`: "This experience is already archived."
+
+3. **Move to in-progress** (if first time):
+   - If file is in `drafts/`, move it to `in-progress/`
+   - Preserve exact filename
+   - Read the original content
+
+4. **Determine conversation state**:
+   - Check if file has "## AI Refinement Questions" section
+   - If not present: This is the first refinement (ask first question)
+   - If present: Parse Q&A history to determine next question
+
+5. **Ask targeted questions** (ONE at a time):
+   - Duration (start/end dates) - REQUIRED
+   - Achievements (quantifiable outcomes)
+   - Learnings
+   - Project context
+   - Technologies used
+   - Reflections
+
+6. **Check for completion signals**:
+   - Korean: "충분해", "완료", "끝"
+   - English: "sufficient", "done", "enough", "finished"
+   - If complete: Confirm readiness and suggest archiving via handoff
+
+7. **Update file with Q&A**:
+   - Append new question to file under "## AI Refinement Questions"
+   - Preserve user's original content
