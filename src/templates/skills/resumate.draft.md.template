@@ -17,38 +17,30 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-This skill enables users to capture career experiences in a diary-like, free-form format without worrying about structure or completeness.
+This skill creates a new experience draft file using the CLI, then optionally fills it with user-provided content.
 
-1. **Check initialization**: Verify that `.resumate/` directory exists
-   - If not found: ERROR: "Resumate not initialized. Run `resumate init <projectname>` first."
-   - Check for `drafts/`, `in-progress/`, and `archive/` subdirectories
+1. **Run CLI to create draft file**:
+   ```bash
+   resumate add
+   ```
+   - This creates an empty `drafts/YYYY-MM-DD.md` file (handles date naming and collision automatically)
+   - Read the CLI output to get the created filename
 
-2. **Capture user's experience**:
-   - If `$ARGUMENTS` is provided, use it as the experience content
-   - If empty, prompt the user: "Please write about your experience in free-form text (like a diary entry). Don't worry about structure - just write naturally."
+2. **If user provided content** (via `$ARGUMENTS` or conversation):
+   - Write the user's content to the created file in `drafts/`
    - Accept input in any language (Korean, English, mixed)
 
-3. **Generate filename**:
-   - Extract title from first line or first 50 characters
-   - Use current date in `YYYY-MM-DD` format
-   - Create slug from title using lowercase, hyphenated format
-   - Check for duplicate filenames in `drafts/` directory
-   - If duplicate exists, append `-1`, `-2`, etc.
-   - Final format: `YYYY-MM-DD-title-slug.md`
+3. **If no content provided**:
+   - Ask the user to write their experience in free-form text
+   - Once received, write it to the created file
+   - If user declines, leave the file empty — they can edit it manually later
 
-4. **Create draft file**:
-   - Write content to `.resumate/drafts/[filename]`
-   - Include user's free-form text exactly as written
-   - If user provided a title, use `# Title` as first line
-   - Otherwise, auto-generate title from content
+4. **Confirm and guide**:
+   - Show the created file path
+   - Tell the user: "파일을 편집한 뒤 `/resumate.refine @파일명`으로 리파인을 시작하세요."
 
-5. **Confirm creation**:
-   - Display success message with filename
-   - Show file location: `.resumate/drafts/[filename]`
-   - Suggest next step via handoff button: "Refine this draft with AI"
+## Important
 
-## Error Handling
-
-- **Not initialized**: "Resumate not initialized. Run `resumate init <projectname>` in your terminal first."
-- **Empty input**: "Please provide some content for your experience."
-- **File write error**: "Failed to create draft file. Please check directory permissions for `.resumate/drafts/`"
+- **MUST** use `resumate add` CLI command for file creation — do NOT create files manually
+- The CLI handles filename generation, collision detection, and directory validation
+- Only use Write tool to fill content into the file the CLI already created

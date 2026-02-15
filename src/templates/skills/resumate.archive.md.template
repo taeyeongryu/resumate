@@ -12,42 +12,26 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-This skill converts a refined in-progress experience into the final archived format with YAML frontmatter.
+This skill archives a refined experience by running the CLI command, which extracts structured data and generates the final YAML frontmatter file.
 
-1. **Parse filename argument**:
-   - Extract filename from `$ARGUMENTS`
-   - Support formats: `@filename`, `filename.md`, or just `filename`
-   - Auto-append `.md` if missing
+1. **Run CLI to archive**:
+   ```bash
+   resumate archive $ARGUMENTS
+   ```
+   - The CLI reads the in-progress file, extracts data from Q&A answers, generates YAML frontmatter, and writes to `archive/`
+   - Read the CLI output to understand the result
 
-2. **Locate file**:
-   - Look in `.resumate/in-progress/` directory
-   - If not found: "File not found in in-progress/. Did you run `/resumate refine` first?"
-   - If found in `drafts/`: "This draft hasn't been refined yet. Run `/resumate refine @[filename]` first."
-   - If already in `archive/`: "This experience is already archived."
+2. **Relay the CLI output to the user**:
+   - Show the extracted fields (title, duration, technologies, achievements, etc.)
+   - Show the archive file location
+   - Congratulate the user — their experience is now structured and resume-ready
 
-3. **Parse in-progress file**:
-   - Extract original content
-   - Parse all Q&A pairs from "## AI Refinement Questions" section
-   - Extract: Title, Date, Duration, Achievements, Technologies, Learnings, Reflections, Project
+3. **If the CLI reports an error**:
+   - Relay the error message to the user
+   - If missing required fields: suggest running `/resumate.refine @파일명` to complete them
+   - If file not found: suggest checking the filename or running refine first
 
-4. **Validate required fields**:
-   - Title (must exist)
-   - Date (must be valid ISO date)
-   - Duration (must have start and end dates)
-   - Content (original text must exist)
+## Important
 
-5. **Generate YAML frontmatter**:
-   - Convert Q&A answers to structured fields
-   - Parse dates to ISO format (YYYY-MM-DD)
-   - Parse lists (technologies, tags, achievements)
-
-6. **Create archived file**:
-   - Write to `.resumate/archive/[filename]`
-   - YAML frontmatter header + markdown body
-
-7. **Remove from in-progress**:
-   - Delete file from `in-progress/` only after successful archive
-
-8. **Confirm success**:
-   - Display extracted fields summary
-   - Show file location
+- **MUST** use `resumate archive` CLI command — do NOT create archive files manually
+- The CLI handles: data extraction, YAML generation, file movement, validation

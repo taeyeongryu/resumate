@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { initCommand } from './commands/init.js';
+import { initCommand, updateCommand } from './commands/init.js';
 import { addCommand } from './commands/add.js';
 import { refineCommand } from './commands/refine.js';
 import { archiveCommand } from './commands/archive.js';
@@ -18,6 +18,11 @@ program
   .argument('<projectname>', 'Project name for .resumate directory')
   .description('Initialize Resumate project structure')
   .action(initCommand);
+
+program
+  .command('update')
+  .description('Update Claude Code skill definitions to latest version')
+  .action(updateCommand);
 
 program
   .command('add')

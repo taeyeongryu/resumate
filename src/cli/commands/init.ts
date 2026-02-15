@@ -17,6 +17,26 @@ function getTemplatesDir(): string {
   return path.resolve(__dirname, '..', '..', 'templates', 'skills');
 }
 
+export async function updateCommand(): Promise<void> {
+  const rootDir = process.cwd();
+  const config = createConfig(rootDir);
+
+  if (!(await directoryExists(config.resumateDir))) {
+    console.error('Error: Resumate not initialized in this directory.');
+    console.error('Run `resumate init <projectname>` first.');
+    process.exit(1);
+  }
+
+  try {
+    await installSkills(config.claudeCommandsDir);
+    console.log('Updated Claude Code skill definitions in .claude/commands/');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`Error updating skills: ${message}`);
+    process.exit(1);
+  }
+}
+
 export async function initCommand(projectname: string): Promise<void> {
   const rootDir = path.resolve(process.cwd(), projectname);
   const config = createConfig(rootDir);

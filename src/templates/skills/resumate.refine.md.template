@@ -1,5 +1,5 @@
 ---
-description: Refine a draft through AI-guided conversation
+description: Refine a draft through file-based Q&A
 handoffs:
   - label: Archive this experience
     agent: resumate.archive
@@ -17,42 +17,28 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-This skill enables AI-guided refinement of draft experiences through conversational Q&A.
+This skill refines a draft experience by running the CLI command, which writes Q&A questions directly into the file. The user edits the file to answer, then runs this skill again.
 
-1. **Parse filename argument**:
-   - Extract filename from `$ARGUMENTS` (pattern: `@filename` or just `filename`)
-   - Support both formats: `@2024-02-15-example.md` and `2024-02-15-example`
-   - Auto-append `.md` if missing
+1. **Run CLI to refine**:
+   ```bash
+   resumate refine $ARGUMENTS
+   ```
+   - The CLI locates the file, moves it to `in-progress/` if needed, and writes the next Q&A question into the file
+   - Read the CLI output to understand the current state
 
-2. **Locate and read file**:
-   - Check `.resumate/drafts/` directory first (if first-time refinement)
-   - Check `.resumate/in-progress/` directory (if continuing refinement)
-   - If file not found in either: ERROR
-   - If found in `.resumate/archive/`: "This experience is already archived."
+2. **Relay the CLI output to the user**:
+   - Show which question was added to the file
+   - Tell the user to open `in-progress/[filename]` and write their answer in the file
+   - Tell the user to run `/resumate.refine @파일명` again after answering
 
-3. **Move to in-progress** (if first time):
-   - If file is in `drafts/`, move it to `in-progress/`
-   - Preserve exact filename
-   - Read the original content
+3. **STOP here. Do NOT continue the conversation.**
+   - Do NOT ask the user questions in chat
+   - Do NOT try to collect answers through conversation
+   - The entire Q&A happens through FILE EDITING, not chat
 
-4. **Determine conversation state**:
-   - Check if file has "## AI Refinement Questions" section
-   - If not present: This is the first refinement (ask first question)
-   - If present: Parse Q&A history to determine next question
+## Important
 
-5. **Ask targeted questions** (ONE at a time):
-   - Duration (start/end dates) - REQUIRED
-   - Achievements (quantifiable outcomes)
-   - Learnings
-   - Project context
-   - Technologies used
-   - Reflections
-
-6. **Check for completion signals**:
-   - Korean: "충분해", "완료", "끝"
-   - English: "sufficient", "done", "enough", "finished"
-   - If complete: Confirm readiness and suggest archiving via handoff
-
-7. **Update file with Q&A**:
-   - Append new question to file under "## AI Refinement Questions"
-   - Preserve user's original content
+- **MUST** use `resumate refine` CLI command — do NOT move files or edit Q&A sections manually
+- **MUST** stop after relaying the CLI output — this is a ONE-TURN skill
+- The workflow is: run skill → user edits file → run skill again → repeat
+- The CLI handles: file location, file movement, Q&A formatting, completion detection
