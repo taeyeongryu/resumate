@@ -1,0 +1,37 @@
+# Speckit workflow system (local development only)
+.claude/
+.specify/
+specs/
+examples/
+
+# Claude Code guidance
+CLAUDE.md
+
+# Working files
+whatiwantspec.md
+
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+*.log
+
+# Build outputs
+dist/
+build/
+*.egg-info/
+target/
