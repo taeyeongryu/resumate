@@ -9,6 +9,8 @@ CLAUDE.md
 
 # Working files
 whatiwantspec.md
+*.tmp
+tmp/
 
 # Dependencies
 node_modules/
