@@ -11,9 +11,9 @@ function makeConfig(): ResumateConfig {
   return {
     rootDir: TEST_DIR,
     resumateDir: path.join(TEST_DIR, '.resumate'),
-    draftsDir: path.join(TEST_DIR, '.resumate', 'drafts'),
-    inProgressDir: path.join(TEST_DIR, '.resumate', 'in-progress'),
-    archiveDir: path.join(TEST_DIR, '.resumate', 'archive'),
+    draftsDir: path.join(TEST_DIR, 'drafts'),
+    inProgressDir: path.join(TEST_DIR, 'in-progress'),
+    archiveDir: path.join(TEST_DIR, 'archive'),
     claudeCommandsDir: path.join(TEST_DIR, '.claude', 'commands'),
   };
 }

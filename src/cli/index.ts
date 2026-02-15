@@ -2,7 +2,7 @@
 
 import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
-import { draftCommand } from './commands/draft.js';
+import { addCommand } from './commands/add.js';
 import { refineCommand } from './commands/refine.js';
 import { archiveCommand } from './commands/archive.js';
 
@@ -20,10 +20,9 @@ program
   .action(initCommand);
 
 program
-  .command('draft')
-  .argument('<content>', 'Free-form experience text')
-  .description('Create a new experience draft')
-  .action(draftCommand);
+  .command('add')
+  .description('Create a new empty experience draft with today\'s date')
+  .action(addCommand);
 
 program
   .command('refine')

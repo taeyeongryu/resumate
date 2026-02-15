@@ -59,12 +59,12 @@ cd my-career
 
 ```
 my-career/
-├── .resumate/
-│   ├── drafts/        # 자유 형식 경험 초안
-│   ├── in-progress/   # AI Q&A 리파인 진행 중
-│   └── archive/       # 최종 구조화 데이터
+├── .resumate/           # 메타정보 (설정, 내부 데이터)
+├── drafts/              # 자유 형식 경험 초안
+├── in-progress/         # AI Q&A 리파인 진행 중
+├── archive/             # 최종 구조화 데이터
 └── .claude/
-    └── commands/      # Claude Code 스킬 정의
+    └── commands/        # Claude Code 스킬 정의
         ├── resumate.draft.md
         ├── resumate.refine.md
         └── resumate.archive.md
@@ -72,11 +72,13 @@ my-career/
 
 ### 2단계: 경험 초안 작성
 
-**CLI에서 직접 작성:**
-
 ```bash
-resumate draft "# React 성능 최적화 프로젝트\n\n회사 대시보드의 로딩 속도를 개선했다. 기존에 5초 걸리던 초기 렌더링을 2초대로 줄였고, React.memo와 useMemo를 활용한 최적화를 진행했다."
+resumate add
 ```
+
+오늘 날짜로 빈 마크다운 파일이 `drafts/` 디렉토리에 생성됩니다 (예: `drafts/2024-06-15.md`). 같은 날짜에 여러 파일을 생성하면 자동으로 `-1`, `-2` 등의 번호가 붙습니다.
+
+생성된 파일을 편집기에서 열어 경험을 자유롭게 작성하세요.
 
 **Claude Code에서 스킬로 작성:**
 
@@ -86,18 +88,16 @@ resumate draft "# React 성능 최적화 프로젝트\n\n회사 대시보드의 
 
 Claude Code 내에서 대화형으로 경험을 작성할 수 있습니다.
 
-작성된 초안은 `.resumate/drafts/` 디렉토리에 `YYYY-MM-DD-slug.md` 형식으로 저장됩니다. 동일한 제목이 있으면 자동으로 `-1`, `-2` 등의 번호가 붙습니다.
-
 ### 3단계: AI Q&A로 리파인
 
 ```bash
-resumate refine @2024-06-15-react-성능-최적화-프로젝트
+resumate refine @2024-06-15
 ```
 
 또는 Claude Code에서:
 
 ```
-/resumate.refine @2024-06-15-react-성능-최적화-프로젝트
+/resumate.refine @2024-06-15
 ```
 
 리파인 과정에서 AI가 다음 질문들을 순서대로 안내합니다:
@@ -129,13 +129,13 @@ resumate refine @2024-06-15-react-성능-최적화-프로젝트
 ### 4단계: 아카이브 (구조화)
 
 ```bash
-resumate archive 2024-06-15-react-성능-최적화-프로젝트
+resumate archive 2024-06-15
 ```
 
 또는 Claude Code에서:
 
 ```
-/resumate.archive 2024-06-15-react-성능-최적화-프로젝트
+/resumate.archive 2024-06-15
 ```
 
 아카이브 명령은 Q&A 답변에서 자동으로 데이터를 추출하여 YAML frontmatter가 포함된 구조화된 마크다운 파일을 생성합니다.
@@ -150,25 +150,25 @@ resumate archive 2024-06-15-react-성능-최적화-프로젝트
 | 명령어 | 설명 | 사용법 |
 |--------|------|--------|
 | `resumate init <name>` | 프로젝트 초기화 | `resumate init my-career` |
-| `resumate draft <text>` | 경험 초안 작성 | `resumate draft "# 제목\n\n내용"` |
+| `resumate add` | 빈 경험 초안 파일 생성 | `resumate add` |
 | `resumate refine <file>` | AI Q&A로 경험 리파인 | `resumate refine @파일명` |
 | `resumate archive <file>` | 구조화된 최종 포맷으로 변환 | `resumate archive 파일명` |
 
 **파일명 참고:**
 - `@` 접두사는 자동으로 제거됩니다
 - `.md` 확장자가 없으면 자동으로 추가됩니다
-- 예: `@2024-06-15-my-project` → `2024-06-15-my-project.md`
+- 예: `@2024-06-15` → `2024-06-15.md`
 
 ## Workflow
 
 ```
-Draft (자유 형식) → Refine (AI Q&A) → Archive (구조화 YAML)
+Add (빈 파일 생성) → Edit (사용자 작성) → Refine (AI Q&A) → Archive (구조화 YAML)
 ```
 
 파일은 세 디렉토리를 거쳐 이동합니다:
 
 ```
-.resumate/
+project/
 ├── drafts/        # 자유 형식 경험 초안
 ├── in-progress/   # AI Q&A 리파인 진행 중
 └── archive/       # 최종 구조화 포맷
@@ -266,7 +266,7 @@ src/
 ├── cli/
 │   ├── commands/          # CLI 명령어 구현
 │   │   ├── init.ts        # 프로젝트 초기화
-│   │   ├── draft.ts       # 초안 작성
+│   │   ├── add.ts         # 빈 초안 파일 생성
 │   │   ├── refine.ts      # AI Q&A 리파인
 │   │   └── archive.ts     # 구조화 아카이브
 │   ├── utils/
@@ -286,6 +286,7 @@ src/
     └── skills/            # Claude Code 스킬 템플릿
 tests/
 ├── unit/                  # 단위 테스트
+│   ├── commands/
 │   ├── services/
 │   ├── utils/
 │   └── templates/

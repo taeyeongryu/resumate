@@ -83,7 +83,7 @@ export async function archiveCommand(filenameArg: string): Promise<void> {
 
   if (location === 'archive') {
     console.error('This experience is already archived.');
-    console.error(`  Location: .resumate/archive/${filename}`);
+    console.error(`  Location: archive/${filename}`);
     process.exit(1);
   }
 
@@ -149,7 +149,7 @@ export async function archiveCommand(filenameArg: string): Promise<void> {
 
     console.log('Experience archived successfully!');
     console.log('');
-    console.log(`  File: .resumate/archive/${filename}`);
+    console.log(`  File: archive/${filename}`);
     console.log('');
     console.log('Extracted fields:');
     console.log(`  Title: ${data.title}`);

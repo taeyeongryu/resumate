@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { createConfig, SUBDIRECTORIES } from '../../models/config.js';
+import { createConfig } from '../../models/config.js';
 import { ensureDirectory, directoryExists, writeFile, readFile } from '../../services/file-manager.js';
 import { fileURLToPath } from 'node:url';
 
@@ -28,11 +28,14 @@ export async function initCommand(projectname: string): Promise<void> {
   }
 
   try {
-    // Create .resumate/ subdirectories
-    for (const subdir of SUBDIRECTORIES) {
-      await ensureDirectory(path.join(config.resumateDir, subdir));
-    }
-    console.log(`Created .resumate/ directory structure in ${projectname}/`);
+    // Create .resumate/ for metadata
+    await ensureDirectory(config.resumateDir);
+
+    // Create root-level data directories
+    await ensureDirectory(config.draftsDir);
+    await ensureDirectory(config.inProgressDir);
+    await ensureDirectory(config.archiveDir);
+    console.log(`Created directory structure in ${projectname}/`);
 
     // Install Claude Code skills
     await installSkills(config.claudeCommandsDir);
@@ -43,15 +46,15 @@ export async function initCommand(projectname: string): Promise<void> {
     console.log('');
     console.log('Directory structure:');
     console.log(`  ${projectname}/`);
-    console.log('  └── .resumate/');
-    console.log('      ├── drafts/');
-    console.log('      ├── in-progress/');
-    console.log('      └── archive/');
+    console.log('  ├── .resumate/         # metadata');
+    console.log('  ├── drafts/            # experience drafts');
+    console.log('  ├── in-progress/       # refinement in progress');
+    console.log('  └── archive/           # structured archive');
     console.log('');
     console.log('Next steps:');
     console.log(`  1. cd ${projectname}`);
     console.log('  2. Open Claude Code: claude');
-    console.log('  3. Create your first draft: /resumate draft');
+    console.log('  3. Add a new experience: resumate add');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Error initializing Resumate: ${message}`);

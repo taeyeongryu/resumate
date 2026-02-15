@@ -30,7 +30,7 @@ export async function refineCommand(filenameArg: string): Promise<void> {
 
   if (location === 'archive') {
     console.error(`This experience is already archived.`);
-    console.error(`  Location: .resumate/archive/${filename}`);
+    console.error(`  Location: archive/${filename}`);
     process.exit(1);
   }
 

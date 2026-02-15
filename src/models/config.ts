@@ -14,12 +14,11 @@ export function createConfig(rootDir: string): ResumateConfig {
   return {
     rootDir,
     resumateDir,
-    draftsDir: path.join(resumateDir, 'drafts'),
-    inProgressDir: path.join(resumateDir, 'in-progress'),
-    archiveDir: path.join(resumateDir, 'archive'),
+    draftsDir: path.join(rootDir, 'drafts'),
+    inProgressDir: path.join(rootDir, 'in-progress'),
+    archiveDir: path.join(rootDir, 'archive'),
     claudeCommandsDir: path.join(rootDir, '.claude', 'commands'),
   };
 }
 
 export const RESUMATE_DIR_NAME = '.resumate';
-export const SUBDIRECTORIES = ['drafts', 'in-progress', 'archive'] as const;
