@@ -5,9 +5,11 @@ import {
   questionTemplates,
   generateQuestionPrompt,
   buildPromptOutput,
+  generateArchivePrompt,
+  buildArchivePromptOutput,
 } from '../../../src/templates/ai-prompts.js';
 import { ExperienceType, Language } from '../../../src/models/experience.js';
-import type { DraftAnalysis } from '../../../src/models/experience.js';
+import type { DraftAnalysis, ArchiveAnalysis } from '../../../src/models/experience.js';
 
 describe('questionTemplates', () => {
   it('should have 6 templates', () => {
@@ -204,5 +206,126 @@ describe('generateQuestionPrompt - type-specific guidance', () => {
     const prompt = generateQuestionPrompt(analysis);
     // GENERAL should still have a valid prompt but without type-specific guidance
     expect(prompt).toContain('Draft Content');
+  });
+});
+
+// --- Archive Prompt Tests ---
+
+function makeArchiveAnalysis(overrides: Partial<ArchiveAnalysis> = {}): ArchiveAnalysis {
+  return {
+    title: 'React 성능 최적화',
+    dateStr: '2024-06-15',
+    originalContent: 'TechCorp에서 React 프로젝트의 성능을 최적화하는 작업을 진행했습니다.',
+    qaPairs: [
+      { question: '이 작업의 구체적인 기간이 어떻게 되나요?', answer: '3월 말부터 상반기까지' },
+      { question: '어떤 성과가 있었나요?', answer: '로딩 시간 반으로 줄임' },
+      { question: '어떤 기술이나 도구를 사용했나요?', answer: 'react, ts, 레디스' },
+    ],
+    language: Language.KOREAN,
+    experienceType: ExperienceType.TECHNICAL_PROJECT,
+    ...overrides,
+  };
+}
+
+describe('generateArchivePrompt', () => {
+  it('should include original content in the prompt', () => {
+    const analysis = makeArchiveAnalysis();
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('TechCorp에서 React 프로젝트');
+  });
+
+  it('should include Q&A pairs in the prompt', () => {
+    const analysis = makeArchiveAnalysis();
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('3월 말부터 상반기까지');
+    expect(prompt).toContain('로딩 시간 반으로 줄임');
+    expect(prompt).toContain('react, ts, 레디스');
+  });
+
+  it('should include technology normalization instructions', () => {
+    const analysis = makeArchiveAnalysis();
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('TypeScript');
+    expect(prompt).toContain('레디스');
+    expect(prompt).toContain('Redis');
+  });
+
+  it('should include achievement formatting instructions', () => {
+    const analysis = makeArchiveAnalysis();
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('resume-ready');
+    expect(prompt).toContain('resumeReady');
+  });
+
+  it('should include JSON output schema', () => {
+    const analysis = makeArchiveAnalysis();
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('"title"');
+    expect(prompt).toContain('"duration"');
+    expect(prompt).toContain('"technologies"');
+    expect(prompt).toContain('"completeness"');
+    expect(prompt).toContain('"qaSummary"');
+  });
+
+  it('should include completeness scoring instructions', () => {
+    const analysis = makeArchiveAnalysis();
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('0-100');
+    expect(prompt).toContain('weight');
+  });
+
+  it('should specify Korean language for Korean content', () => {
+    const analysis = makeArchiveAnalysis({ language: Language.KOREAN });
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('Korean');
+  });
+
+  it('should specify English language for English content', () => {
+    const analysis = makeArchiveAnalysis({ language: Language.ENGLISH });
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('English');
+  });
+
+  it('should handle empty Q&A pairs', () => {
+    const analysis = makeArchiveAnalysis({ qaPairs: [] });
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('No Q&A section found');
+  });
+
+  it('should include experience metadata', () => {
+    const analysis = makeArchiveAnalysis();
+    const prompt = generateArchivePrompt(analysis);
+    expect(prompt).toContain('React 성능 최적화');
+    expect(prompt).toContain('2024-06-15');
+    expect(prompt).toContain('technical-project');
+  });
+});
+
+describe('buildArchivePromptOutput', () => {
+  it('should return ready status', () => {
+    const analysis = makeArchiveAnalysis();
+    const output = buildArchivePromptOutput(analysis, '2024-06-15-react-optimization');
+    expect(output.status).toBe('ready');
+  });
+
+  it('should include the analysis', () => {
+    const analysis = makeArchiveAnalysis();
+    const output = buildArchivePromptOutput(analysis, '2024-06-15-react-optimization');
+    expect(output.analysis).toBe(analysis);
+  });
+
+  it('should include non-empty prompt', () => {
+    const analysis = makeArchiveAnalysis();
+    const output = buildArchivePromptOutput(analysis, '2024-06-15-react-optimization');
+    expect(output.prompt).not.toBe('');
+    expect(output.prompt).toContain('JSON');
+  });
+
+  it('should include correct metadata', () => {
+    const analysis = makeArchiveAnalysis();
+    const output = buildArchivePromptOutput(analysis, '2024-06-15-react-optimization');
+    expect(output.metadata.experienceDir).toBe('2024-06-15-react-optimization');
+    expect(output.metadata.experienceName).toBe('2024-06-15-react-optimization');
+    expect(output.metadata.outputFormat).toBe('json');
   });
 });

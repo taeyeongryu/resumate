@@ -12,7 +12,7 @@ const program = new Command();
 program
   .name('resumate')
   .description('AI-powered experience structuring tool for resume building')
-  .version('0.1.0');
+  .version('1.0.0');
 
 program
   .command('init')
@@ -47,6 +47,8 @@ program
 program
   .command('archive')
   .argument('<query>', 'Experience to archive (directory name or search query)')
+  .option('--prompt', 'Output archive analysis and AI structuring prompt as JSON (for Claude Code integration)')
+  .option('--content <json>', 'Accept AI-structured content as JSON and write archived.md')
   .description('Convert refined experience to final structured format')
   .action(archiveCommand);
 
