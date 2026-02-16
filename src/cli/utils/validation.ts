@@ -1,5 +1,6 @@
 import { directoryExists } from '../../services/file-manager.js';
 import { RESUMATE_DIR_NAME } from '../../models/config.js';
+import type { StructuredArchiveContent } from '../../models/experience.js';
 import path from 'node:path';
 
 export async function validateResumateInitialized(rootDir: string): Promise<boolean> {
@@ -115,6 +116,50 @@ export function parseList(text: string): string[] {
     .split(/[,，]/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0);
+}
+
+export function validateStructuredArchiveContent(json: string): StructuredArchiveContent {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error('Invalid JSON: could not parse structured archive content');
+  }
+
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new Error('Invalid structured archive content: expected an object');
+  }
+
+  const data = parsed as Record<string, unknown>;
+
+  if (typeof data.title !== 'string' || data.title.trim().length === 0) {
+    throw new Error('Invalid structured archive content: title must be a non-empty string');
+  }
+
+  if (data.completeness && typeof data.completeness === 'object') {
+    const completeness = data.completeness as Record<string, unknown>;
+    if (typeof completeness.score === 'number' && (completeness.score < 0 || completeness.score > 100)) {
+      throw new Error('Invalid structured archive content: completeness.score must be 0-100');
+    }
+  }
+
+  // Provide defaults for optional fields
+  return {
+    title: data.title as string,
+    duration: (data.duration as StructuredArchiveContent['duration']) ?? null,
+    project: (data.project as string) ?? null,
+    technologies: Array.isArray(data.technologies) ? data.technologies : [],
+    achievements: Array.isArray(data.achievements) ? data.achievements : [],
+    learnings: (data.learnings as string) ?? null,
+    reflections: (data.reflections as string) ?? null,
+    qaSummary: Array.isArray(data.qaSummary) ? data.qaSummary : [],
+    completeness: (data.completeness as StructuredArchiveContent['completeness']) ?? {
+      score: 0,
+      breakdown: {},
+      suggestions: [],
+    },
+    aiComments: (data.aiComments as string) ?? '',
+  };
 }
 
 export function generateTags(technologies: string[]): string[] {

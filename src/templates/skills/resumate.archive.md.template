@@ -1,5 +1,5 @@
 ---
-description: Convert refined entry to final structured format
+description: Convert refined entry to final AI-structured format
 ---
 
 ## User Input
@@ -12,26 +12,64 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-This skill archives a refined experience by running the CLI command, which extracts structured data and generates the final YAML frontmatter file.
+This skill archives a refined experience by using AI-powered structuring. It analyzes the refined content, generates structured data (technology normalization, resume-ready achievements, completeness scoring), and writes the final archived.md.
 
-1. **Run CLI to archive**:
-   ```bash
-   resumate archive $ARGUMENTS
-   ```
-   - The CLI reads the in-progress file, extracts data from Q&A answers, generates YAML frontmatter, and writes to `archive/`
-   - Read the CLI output to understand the result
+### Step 1: Analyze the refined content
 
-2. **Relay the CLI output to the user**:
-   - Show the extracted fields (title, duration, technologies, achievements, etc.)
-   - Show the archive file location
-   - Congratulate the user — their experience is now structured and resume-ready
+Run the CLI with `--prompt` to get refined content analysis and AI structuring prompt:
 
-3. **If the CLI reports an error**:
-   - Relay the error message to the user
-   - If missing required fields: suggest running `/resumate.refine @파일명` to complete them
-   - If file not found: suggest checking the filename or running refine first
+```bash
+resumate archive $ARGUMENTS --prompt
+```
+
+Parse the JSON output. It contains:
+- `status`: "ready"
+- `analysis`: Refined content analysis (title, Q&A pairs, language, experience type)
+- `prompt`: AI structuring instructions with JSON output schema
+- `metadata`: Experience directory info
+
+### Step 2: Generate structured content from the prompt
+
+Read the `prompt` field from the JSON output. Follow the instructions in the prompt to generate a structured JSON response.
+
+The prompt will ask you to:
+- **Normalize technology names** (e.g., "ts" → "TypeScript", "레디스" → "Redis")
+- **Create resume-ready achievement versions** (e.g., "로딩 시간 반으로 줄임" → "페이지 로딩 시간 50% 개선")
+- **Interpret natural language dates** (e.g., "3월 말부터 상반기까지" → specific date range)
+- **Summarize Q&A with interpretations** for ambiguous answers
+- **Score completeness** (0-100%) with per-field breakdown and improvement suggestions
+- **Add AI comments** about the experience quality
+
+Output your response as a JSON object matching the `StructuredArchiveContent` schema specified in the prompt.
+
+### Step 3: Write the structured archive
+
+Run the CLI with `--content` to write the AI-structured archive:
+
+```bash
+resumate archive $ARGUMENTS --content '<your_generated_json>'
+```
+
+### Step 4: Relay the result to the user
+
+- Show the structured fields (title, duration, technologies, achievements, completeness score)
+- Show improvement suggestions if completeness is below 80%
+- Congratulate the user — their experience is now structured and resume-ready
+
+### Fallback
+
+If **any step fails** (CLI error, JSON parsing failure, etc.), fall back to the standalone mode:
+
+```bash
+resumate archive $ARGUMENTS
+```
+
+The standalone mode uses keyword-matching extraction and **never fails** — it produces a best-effort archive with available data.
+
+Then relay the CLI output to the user.
 
 ## Important
 
 - **MUST** use `resumate archive` CLI command — do NOT create archive files manually
-- The CLI handles: data extraction, YAML generation, file movement, validation
+- **MUST** use the two-step `--prompt` → `--content` flow for AI-enhanced results
+- The CLI handles: content analysis, YAML generation, file writing, completeness scoring

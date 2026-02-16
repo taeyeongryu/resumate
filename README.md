@@ -10,7 +10,7 @@ Capture career experiences as casual diary entries, refine them through AI-guide
 
 - Node.js 18 or higher
 - npm (Node.js와 함께 설치됨)
-- [Claude Code](https://claude.ai/code) (AI 기반 리파인 기능 사용 시 필요)
+- [Claude Code](https://claude.ai/code) (AI 기반 리파인/아카이브 기능 사용 시 필요)
 
 ### npm 글로벌 설치
 
@@ -41,7 +41,7 @@ npm link
 
 ```bash
 resumate --version
-# 0.2.0
+# 1.0.0
 
 resumate --help
 ```
@@ -134,7 +134,7 @@ resumate refine react-optimization
 - 한국어: `충분해`, `완료`, `끝`
 - 영어: `done`, `sufficient`, `enough`, `finished`
 
-### 4단계: 아카이브 (구조화)
+### 4단계: 아카이브 (AI 구조화)
 
 ```bash
 resumate archive react-optimization
@@ -146,7 +146,32 @@ resumate archive react-optimization
 /resumate.archive react-optimization
 ```
 
-아카이브 명령은 Q&A 답변에서 자동으로 데이터를 추출하여 `archived.md`를 생성합니다.
+아카이브 명령은 두 가지 모드로 동작합니다:
+
+#### AI 모드 (Claude Code 연동)
+
+AI가 Q&A 답변을 분석하여 다음을 수행합니다:
+- 자연어 날짜 해석 (예: "3월 말부터 상반기까지" → 구체적 기간 추정)
+- 기술명 정규화 (예: "ts" → "TypeScript", "레디스" → "Redis")
+- 성과의 이력서용 버전 생성 (예: "반으로 줄임" → "50% 개선")
+- Q&A 요약 및 AI 해석 추가
+- 완성도 점수 (0-100%) 및 개선 제안
+
+```bash
+# Step 1: 구조화 프롬프트 생성
+resumate archive --prompt react-optimization
+
+# Step 2: AI가 처리한 결과를 전달
+resumate archive --content '<structured-json>' react-optimization
+```
+
+#### 독립 실행 모드 (폴백)
+
+Claude Code 없이도 동작합니다. 기존 키워드 매칭으로 데이터를 추출하되, **절대 실패하지 않습니다.** 파싱할 수 없는 필드는 생략하고 가능한 데이터만으로 아카이브를 생성합니다.
+
+```bash
+resumate archive react-optimization
+```
 
 **최종 경험 디렉토리 구조:**
 
@@ -166,8 +191,15 @@ experiences/
 | `resumate update` | Claude Code 스킬 정의 업데이트 | `resumate update` |
 | `resumate add` | 새 경험 디렉토리 생성 (draft.md 포함) | `resumate add -t "제목" -c "회사" -r "직책"` |
 | `resumate refine <query>` | AI Q&A로 경험 리파인 | `resumate refine react-optimization` |
-| `resumate archive <query>` | 구조화된 최종 포맷으로 변환 | `resumate archive react-optimization` |
-| `resumate migrate` | 기존 구조를 새 경험 기반 구조로 마이그레이션 | `resumate migrate --dry-run` |
+| `resumate archive <query>` | AI 구조화 아카이브 생성 | `resumate archive react-optimization` |
+
+### archive 옵션
+
+| 옵션 | 설명 |
+|------|------|
+| `--prompt` | AI 구조화 프롬프트를 JSON으로 출력 (Claude Code 연동용) |
+| `--content <json>` | AI가 생성한 구조화 JSON을 받아 archived.md 생성 |
+| *(옵션 없음)* | 독립 실행 모드 — 키워드 매칭 기반 best-effort 아카이브 |
 
 ### 검색 쿼리
 
@@ -184,7 +216,7 @@ experiences/
 ## Workflow
 
 ```
-Add (경험 생성) → Edit (사용자 작성) → Refine (AI Q&A) → Archive (구조화 YAML)
+Add (경험 생성) → Edit (사용자 작성) → Refine (AI Q&A) → Archive (AI 구조화)
 ```
 
 모든 버전이 하나의 경험 디렉토리 안에 보존됩니다:
@@ -197,97 +229,81 @@ experiences/
     └── archived.md    # 최종 구조화 포맷
 ```
 
-## Migration from v0.1.x
-
-기존 v0.1.x 구조(`drafts/`, `in-progress/`, `archive/`)를 사용하고 있다면 마이그레이션이 필요합니다.
-
-### 마이그레이션 미리보기
-
-```bash
-resumate migrate --dry-run
-```
-
-변경 사항 없이 마이그레이션 계획을 확인합니다.
-
-### 마이그레이션 실행
-
-```bash
-resumate migrate
-```
-
-마이그레이션 과정:
-1. 기존 파일 스캔 및 경험별 그룹화
-2. 파일명에서 날짜-슬러그 추출
-3. `experiences/` 디렉토리에 경험별 폴더 생성
-4. 각 파일을 해당 버전(draft.md, refined.md, archived.md)으로 복사
-5. 체크섬으로 무결성 검증
-6. `.backup/`에 원본 백업
-
-### 마이그레이션 옵션
-
-| 옵션 | 설명 |
-|------|------|
-| `--dry-run` | 변경 없이 미리보기만 실행 |
-| `--cleanup` | 마이그레이션 후 기존 디렉토리 삭제 |
-| `--resume <id>` | 중단된 마이그레이션 재개 |
-| `--rollback <id>` | 마이그레이션 롤백 |
-| `-y, --yes` | 확인 프롬프트 건너뛰기 |
-
-### 마이그레이션 후 정리
-
-```bash
-# 마이그레이션 ID를 사용하여 기존 디렉토리 삭제
-resumate migrate --cleanup --resume <migration-id>
-```
-
-### 문제 발생 시 롤백
-
-```bash
-resumate migrate --rollback <migration-id>
-```
-
 ## Archived File Format
 
-아카이브된 파일은 YAML frontmatter와 마크다운 본문으로 구성됩니다:
+AI 모드에서 생성되는 아카이브 파일은 YAML frontmatter와 마크다운 본문으로 구성됩니다:
 
 ```yaml
 ---
-title: "React Performance Optimization"
+title: "React 성능 최적화"
 date: "2024-06-15"
 duration:
-  start: "2024-02-01"
-  end: "2024-06-15"
-project: "Company Dashboard"
+  original: "3월 말부터 상반기까지"
+  start: "2024-03-31"
+  end: "2024-06-30"
+  interpretation: "2024년 3월 말 ~ 6월 말 (약 3개월)"
+project: "TechCorp Dashboard"
 technologies:
-  - React
-  - TypeScript
-  - Redis
+  - original: "react"
+    normalized: "React"
+  - original: "ts"
+    normalized: "TypeScript"
+  - original: "레디스"
+    normalized: "Redis"
 achievements:
-  - "Reduced load time by 50%"
-  - "Handled 1M daily requests"
-learnings: "Learned the importance of memoization..."
-reflections: "This was a transformative experience..."
+  - original: "로딩 시간 반으로 줄임"
+    resumeReady: "페이지 로딩 시간 50% 개선"
+learnings: "성능 최적화의 중요성을 깨달았습니다"
+completeness:
+  score: 85
+  suggestions:
+    - "개인적인 소감을 추가하면 경험의 의미를 더 잘 전달할 수 있습니다"
 tags:
   - frontend
   - typescript
-  - database
 ---
 
 # Detailed Context
 
-Your original experience text...
+TechCorp에서 React 프로젝트의 성능을 최적화하는 작업을 진행했습니다.
 
 ## Achievements
 
-- Reduced load time by 50%
-- Handled 1M daily requests
+- 로딩 시간 반으로 줄임
+  → 이력서 작성 시: "페이지 로딩 시간 50% 개선"
 
 ## Key Learnings
 
-Learned the importance of memoization...
+성능 최적화의 중요성을 깨달았습니다
+
+## Q&A Summary
+
+### Q: 이 작업의 구체적인 기간이 어떻게 되나요?
+**A**: 3월 말부터 상반기까지
+**해석**: 2024년 3월 말 ~ 6월 말경으로 추정
+
+## AI Comments
+
+기술적 성과가 명확하고 정량적입니다.
 ```
 
-**자동 태그 생성:** 기술 스택에서 태그가 자동으로 매핑됩니다:
+### 완성도 점수
+
+아카이브 생성 시 경험의 완성도를 0-100%로 평가합니다:
+
+| 필드 | 가중치 | 품질 보너스 |
+|------|--------|------------|
+| 성과 (achievements) | 25 | 정량적 수치 포함 시 +5 |
+| 기간 (duration) | 20 | 구체적 날짜 포함 시 +5 |
+| 기술 (technologies) | 15 | 3개 초과 시 +3 |
+| 배운 점 (learnings) | 15 | 상세 기술 시 +3 |
+| 제목 (title) | 10 | - |
+| 프로젝트 (project) | 10 | - |
+| 소감 (reflections) | 5 | - |
+
+### 자동 태그 생성
+
+기술 스택에서 태그가 자동으로 매핑됩니다:
 
 | 기술 | 태그 |
 |------|------|
@@ -340,25 +356,24 @@ src/
 │   │   ├── init.ts            # 프로젝트 초기화
 │   │   ├── add.ts             # 경험 디렉토리 생성
 │   │   ├── refine.ts          # AI Q&A 리파인
-│   │   ├── archive.ts         # 구조화 아카이브
-│   │   └── migrate.ts         # v1 → v2 마이그레이션
+│   │   └── archive.ts         # AI 구조화 아카이브
 │   ├── utils/
-│   │   ├── validation.ts      # 파일명/날짜 검증 및 파싱
+│   │   ├── validation.ts      # 검증, 파싱, AI 응답 검증
 │   │   └── prompts.ts         # Q&A 포맷팅 유틸리티
 │   └── index.ts               # CLI 엔트리포인트
 ├── models/
 │   ├── config.ts              # 프로젝트 설정 인터페이스
-│   └── experience.ts          # 경험 데이터 모델
+│   └── experience.ts          # 경험 데이터 모델 및 AI 구조화 타입
 ├── services/
 │   ├── experience-manager.ts  # 경험 디렉토리 CRUD
 │   ├── experience-locator.ts  # 경험 검색 및 매칭
-│   ├── migration-service.ts   # 마이그레이션 서비스
+│   ├── archive-analyzer.ts    # 아카이브 분석 및 완성도 평가
+│   ├── draft-analyzer.ts      # 초안 분석 (필드 감지, 언어/유형 판별)
 │   ├── file-manager.ts        # 파일 I/O 작업
 │   ├── markdown-processor.ts  # 마크다운/frontmatter 파싱
-│   ├── slug-generator.ts      # 파일명 슬러그 생성
-│   └── workflow-manager.ts    # 레거시 파일 상태 전환 관리
+│   └── slug-generator.ts      # 파일명 슬러그 생성
 └── templates/
-    ├── ai-prompts.ts          # 질문 템플릿 및 완료 신호
+    ├── ai-prompts.ts          # 리파인/아카이브 AI 프롬프트 생성
     └── skills/                # Claude Code 스킬 템플릿
 tests/
 ├── unit/                      # 단위 테스트
@@ -369,8 +384,7 @@ tests/
 │   └── templates/
 └── integration/               # 통합 테스트
     ├── commands/
-    ├── search-scenarios.test.ts
-    └── migration-scenarios.test.ts
+    └── search-scenarios.test.ts
 ```
 
 ### 기술 스택

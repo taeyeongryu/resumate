@@ -1,9 +1,17 @@
 import { createConfig } from '../../models/config.js';
-import { validateResumateInitialized, parseDurationFromText, parseList, generateTags } from '../utils/validation.js';
+import { validateResumateInitialized, parseDurationFromText, parseList, generateTags, validateStructuredArchiveContent } from '../utils/validation.js';
 import { ExperienceManager } from '../../services/experience-manager.js';
 import { ExperienceLocator } from '../../services/experience-locator.js';
 import { extractTitle, extractQASection, parseQAPairs, stringifyMarkdown } from '../../services/markdown-processor.js';
+import { analyzeRefined, calculateCompleteness } from '../../services/archive-analyzer.js';
+import { buildArchivePromptOutput } from '../../templates/ai-prompts.js';
 import type { QAPair } from '../../services/markdown-processor.js';
+import type { StructuredArchiveContent, TechEntry } from '../../models/experience.js';
+
+export interface ArchiveOptions {
+  prompt?: boolean;
+  content?: string;
+}
 
 interface ExtractedData {
   title: string;
@@ -49,7 +57,7 @@ function extractData(originalContent: string, qaPairs: QAPair[], dateStr: string
   return { title, date, duration, project, technologies, tags, achievements, learnings, reflections };
 }
 
-export async function archiveCommand(query: string): Promise<void> {
+export async function archiveCommand(query: string, options?: ArchiveOptions): Promise<void> {
   const rootDir = process.cwd();
   const config = createConfig(rootDir);
 
@@ -91,86 +99,228 @@ export async function archiveCommand(query: string): Promise<void> {
       process.exit(1);
     }
 
-    console.log(`Found experience: ${experience.name}`);
-    console.log('');
-    console.log('Generating structured archive from refined version...');
-
     // Read refined content
     const refinedContent = await manager.getVersion(experience.name, 'refined');
-    const qaResult = extractQASection(refinedContent);
-
-    if (!qaResult) {
-      console.error('✗ Error: No refinement questions found in refined version.');
-      process.exit(1);
-    }
-
-    const qaPairs = parseQAPairs(qaResult.qaSection);
     const dateStr = experience.date.toISOString().split('T')[0];
-    const data = extractData(qaResult.originalContent, qaPairs, dateStr);
 
-    // Validate required fields
-    const missing: string[] = [];
-    if (!data.title) missing.push('Title');
-    if (!data.date) missing.push('Date');
-    if (!data.duration) missing.push('Duration (start and end dates)');
-    if (!qaResult.originalContent.trim()) missing.push('Content');
-
-    if (missing.length > 0) {
-      console.error('✗ Error: Cannot archive - missing required fields:');
-      missing.forEach((f) => console.error(`  - ${f}`));
-      console.error(`\nPlease refine the experience further to complete these fields.`);
-      process.exit(1);
+    // Handle --prompt flag: analyze and output JSON
+    if (options?.prompt) {
+      await handlePromptMode(refinedContent, experience.name, dateStr);
+      return;
     }
 
-    // Build frontmatter
-    const frontmatter: Record<string, unknown> = {
-      title: data.title,
-      date: data.date,
-      duration: data.duration,
-    };
-
-    if (data.project) frontmatter.project = data.project;
-    if (data.technologies?.length) frontmatter.technologies = data.technologies;
-    if (data.tags?.length) frontmatter.tags = data.tags;
-    if (data.achievements?.length) frontmatter.achievements = data.achievements;
-    if (data.learnings) frontmatter.learnings = data.learnings;
-    if (data.reflections) frontmatter.reflections = data.reflections;
-
-    // Build body
-    let body = `\n# Detailed Context\n\n${qaResult.originalContent.replace(/^#.*\n\n?/, '').trim()}`;
-
-    if (data.achievements?.length) {
-      body += '\n\n## Achievements\n\n';
-      data.achievements.forEach((a) => (body += `- ${a}\n`));
+    // Handle --content flag: accept AI-structured content and write archive
+    if (options?.content) {
+      await handleContentMode(options.content, refinedContent, experience.name, dateStr, manager);
+      return;
     }
 
-    if (data.learnings) {
-      body += `\n## Key Learnings\n\n${data.learnings}\n`;
-    }
-
-    const archiveContent = stringifyMarkdown(body + '\n', frontmatter);
-
-    await manager.addArchivedVersion(experience.name, archiveContent);
-
-    console.log(`✓ Created archived version: experiences/${experience.name}/archived.md`);
-    console.log('');
-    console.log('  Preserved versions:');
-    console.log('    • draft.md (original)');
-    console.log('    • refined.md (with Q&A)');
-    console.log('');
-    console.log('  Extracted fields:');
-    console.log(`    Title: ${data.title}`);
-    if (data.duration) console.log(`    Duration: ${data.duration.start} to ${data.duration.end}`);
-    if (data.project) console.log(`    Project: ${data.project}`);
-    if (data.technologies?.length) console.log(`    Technologies: ${data.technologies.length} items`);
-    if (data.achievements?.length) console.log(`    Achievements: ${data.achievements.length} items`);
-    if (data.learnings) console.log('    Learnings: Documented');
-    if (data.reflections) console.log('    Reflections: Documented');
-    console.log('');
-    console.log('  Structure: YAML with experience metadata, achievements, and impact');
+    // Default: relaxed fallback mode (never fails)
+    await handleFallbackMode(refinedContent, experience.name, dateStr, manager);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`✗ Error: ${message}`);
     process.exit(1);
+  }
+}
+
+async function handlePromptMode(refinedContent: string, experienceName: string, dateStr: string): Promise<void> {
+  const analysis = analyzeRefined(refinedContent, dateStr);
+  const output = buildArchivePromptOutput(analysis, experienceName);
+  process.stdout.write(JSON.stringify(output));
+}
+
+async function handleContentMode(
+  contentJson: string,
+  refinedContent: string,
+  experienceName: string,
+  dateStr: string,
+  manager: ExperienceManager,
+): Promise<void> {
+  const data = validateStructuredArchiveContent(contentJson);
+
+  console.log(`Found experience: ${experienceName}`);
+  console.log('');
+  console.log('Generating AI-structured archive...');
+
+  // Build frontmatter
+  const frontmatter: Record<string, unknown> = {
+    title: data.title,
+    date: dateStr,
+  };
+
+  if (data.duration) {
+    frontmatter.duration = data.duration;
+  }
+  if (data.project) frontmatter.project = data.project;
+  if (data.technologies.length > 0) frontmatter.technologies = data.technologies;
+  if (data.achievements.length > 0) frontmatter.achievements = data.achievements;
+  if (data.learnings) frontmatter.learnings = data.learnings;
+  if (data.reflections) frontmatter.reflections = data.reflections;
+
+  // Generate tags from normalized technology names
+  const normalizedTechNames = data.technologies.map((t: TechEntry) => t.normalized);
+  const tags = generateTags(normalizedTechNames);
+  if (tags.length > 0) frontmatter.tags = tags;
+
+  // Include completeness metadata
+  frontmatter.completeness = {
+    score: data.completeness.score,
+    suggestions: data.completeness.suggestions,
+  };
+
+  // Build markdown body
+  const qaResult = extractQASection(refinedContent);
+  const originalContent = qaResult
+    ? qaResult.originalContent.replace(/^---[\s\S]*?---\s*/, '').replace(/^#.*\n\n?/, '').trim()
+    : refinedContent.replace(/^---[\s\S]*?---\s*/, '').replace(/^#.*\n\n?/, '').trim();
+
+  let body = `\n# Detailed Context\n\n${originalContent}`;
+
+  // Achievements with resume-ready suggestions
+  if (data.achievements.length > 0) {
+    body += '\n\n## Achievements\n\n';
+    for (const a of data.achievements) {
+      body += `- ${a.original}\n`;
+      if (a.resumeReady !== a.original) {
+        body += `  → 이력서 작성 시: "${a.resumeReady}"\n`;
+      }
+    }
+  }
+
+  // Key Learnings
+  if (data.learnings) {
+    body += `\n## Key Learnings\n\n${data.learnings}\n`;
+  }
+
+  // Q&A Summary
+  if (data.qaSummary.length > 0) {
+    body += '\n## Q&A Summary\n\n';
+    for (const qa of data.qaSummary) {
+      body += `### Q: ${qa.question}\n`;
+      body += `**A**: ${qa.answer}\n`;
+      body += `**해석**: ${qa.interpretation}\n\n`;
+    }
+  }
+
+  // AI Comments
+  if (data.aiComments) {
+    body += `## AI Comments\n\n${data.aiComments}\n`;
+  }
+
+  const archiveContent = stringifyMarkdown(body + '\n', frontmatter);
+  await manager.addArchivedVersion(experienceName, archiveContent);
+
+  printArchiveSuccess(experienceName, data);
+}
+
+async function handleFallbackMode(
+  refinedContent: string,
+  experienceName: string,
+  dateStr: string,
+  manager: ExperienceManager,
+): Promise<void> {
+  console.log(`Found experience: ${experienceName}`);
+  console.log('');
+  console.log('Generating structured archive from refined version...');
+
+  const qaResult = extractQASection(refinedContent);
+
+  // Handle case where there's no Q&A section — archive content as-is
+  const originalContent = qaResult
+    ? qaResult.originalContent
+    : refinedContent;
+  const qaPairs = qaResult ? parseQAPairs(qaResult.qaSection) : [];
+
+  const data = extractData(originalContent, qaPairs, dateStr);
+
+  // Build frontmatter — never fail, use null for missing fields
+  const frontmatter: Record<string, unknown> = {
+    title: data.title || experienceName,
+    date: data.date,
+  };
+
+  if (data.duration) frontmatter.duration = data.duration;
+  if (data.project) frontmatter.project = data.project;
+  if (data.technologies?.length) frontmatter.technologies = data.technologies;
+  if (data.tags?.length) frontmatter.tags = data.tags;
+  if (data.achievements?.length) frontmatter.achievements = data.achievements;
+  if (data.learnings) frontmatter.learnings = data.learnings;
+  if (data.reflections) frontmatter.reflections = data.reflections;
+
+  // Calculate completeness for fallback mode
+  const completeness = calculateCompleteness({
+    title: data.title,
+    duration: data.duration,
+    achievements: data.achievements,
+    technologies: data.technologies,
+    learnings: data.learnings,
+    project: data.project,
+    reflections: data.reflections,
+  });
+  frontmatter.completeness = {
+    score: completeness.score,
+    suggestions: completeness.suggestions,
+  };
+
+  // Build body
+  const contentBody = originalContent.replace(/^---[\s\S]*?---\s*/, '').replace(/^#.*\n\n?/, '').trim();
+  let body = `\n# Detailed Context\n\n${contentBody}`;
+
+  if (data.achievements?.length) {
+    body += '\n\n## Achievements\n\n';
+    data.achievements.forEach((a) => (body += `- ${a}\n`));
+  }
+
+  if (data.learnings) {
+    body += `\n## Key Learnings\n\n${data.learnings}\n`;
+  }
+
+  const archiveContent = stringifyMarkdown(body + '\n', frontmatter);
+
+  await manager.addArchivedVersion(experienceName, archiveContent);
+
+  console.log(`✓ Created archived version: experiences/${experienceName}/archived.md`);
+  console.log('');
+  console.log('  Preserved versions:');
+  console.log('    • draft.md (original)');
+  console.log('    • refined.md (with Q&A)');
+  console.log('');
+  console.log('  Extracted fields:');
+  console.log(`    Title: ${data.title}`);
+  if (data.duration) console.log(`    Duration: ${data.duration.start} to ${data.duration.end}`);
+  if (data.project) console.log(`    Project: ${data.project}`);
+  if (data.technologies?.length) console.log(`    Technologies: ${data.technologies.length} items`);
+  if (data.achievements?.length) console.log(`    Achievements: ${data.achievements.length} items`);
+  if (data.learnings) console.log('    Learnings: Documented');
+  if (data.reflections) console.log('    Reflections: Documented');
+  console.log('');
+  console.log(`  Completeness: ${completeness.score}%`);
+  if (completeness.suggestions.length > 0) {
+    console.log('  Suggestions:');
+    completeness.suggestions.slice(0, 3).forEach((s) => console.log(`    • ${s}`));
+  }
+}
+
+function printArchiveSuccess(experienceName: string, data: StructuredArchiveContent): void {
+  console.log(`✓ Created archived version: experiences/${experienceName}/archived.md`);
+  console.log('');
+  console.log('  Preserved versions:');
+  console.log('    • draft.md (original)');
+  console.log('    • refined.md (with Q&A)');
+  console.log('');
+  console.log('  Structured fields:');
+  console.log(`    Title: ${data.title}`);
+  if (data.duration) console.log(`    Duration: ${data.duration.interpretation}`);
+  if (data.project) console.log(`    Project: ${data.project}`);
+  if (data.technologies.length > 0) console.log(`    Technologies: ${data.technologies.map(t => t.normalized).join(', ')}`);
+  if (data.achievements.length > 0) console.log(`    Achievements: ${data.achievements.length} items`);
+  if (data.learnings) console.log('    Learnings: Documented');
+  if (data.reflections) console.log('    Reflections: Documented');
+  console.log('');
+  console.log(`  Completeness: ${data.completeness.score}%`);
+  if (data.completeness.suggestions.length > 0) {
+    console.log('  Suggestions:');
+    data.completeness.suggestions.slice(0, 3).forEach((s) => console.log(`    • ${s}`));
   }
 }

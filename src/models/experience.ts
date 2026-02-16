@@ -197,3 +197,77 @@ export interface PromptOutput {
   prompt: string;
   metadata: PromptMetadata;
 }
+
+// --- Archive Structuring Types ---
+
+export interface ArchiveAnalysis {
+  title: string;
+  dateStr: string;
+  originalContent: string;
+  qaPairs: QAPair[];
+  language: Language;
+  experienceType: ExperienceType;
+}
+
+export interface QAPair {
+  question: string;
+  answer: string | undefined;
+}
+
+export interface ArchivePromptOutput {
+  status: 'ready';
+  analysis: ArchiveAnalysis;
+  prompt: string;
+  metadata: {
+    experienceDir: string;
+    experienceName: string;
+    outputFormat: 'json';
+  };
+}
+
+export interface TechEntry {
+  original: string;
+  normalized: string;
+}
+
+export interface AchievementEntry {
+  original: string;
+  resumeReady: string;
+}
+
+export interface QASummaryEntry {
+  question: string;
+  answer: string;
+  interpretation: string;
+}
+
+export interface FieldCompleteness {
+  present: boolean;
+  weight: number;
+  qualityScore: number;
+  note?: string;
+}
+
+export interface CompletenessAssessment {
+  score: number;
+  breakdown: Record<string, FieldCompleteness>;
+  suggestions: string[];
+}
+
+export interface StructuredArchiveContent {
+  title: string;
+  duration: {
+    original: string;
+    start?: string;
+    end?: string;
+    interpretation: string;
+  } | null;
+  project: string | null;
+  technologies: TechEntry[];
+  achievements: AchievementEntry[];
+  learnings: string | null;
+  reflections: string | null;
+  qaSummary: QASummaryEntry[];
+  completeness: CompletenessAssessment;
+  aiComments: string;
+}
