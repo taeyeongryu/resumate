@@ -1,5 +1,5 @@
 ---
-description: Refine a draft through file-based Q&A
+description: Refine a draft through AI-powered dynamic Q&A
 handoffs:
   - label: Archive this experience
     agent: resumate.archive
@@ -17,28 +17,78 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-This skill refines a draft experience by running the CLI command, which writes Q&A questions directly into the file. The user edits the file to answer, then runs this skill again.
+This skill refines a draft experience using AI-powered dynamic question generation. It analyzes the draft content and generates context-aware questions about missing information, rather than using hardcoded questions.
 
-1. **Run CLI to refine**:
-   ```bash
-   resumate refine $ARGUMENTS
-   ```
-   - The CLI locates the file, moves it to `in-progress/` if needed, and writes the next Q&A question into the file
-   - Read the CLI output to understand the current state
+### Step 1: Analyze the draft
 
-2. **Relay the CLI output to the user**:
-   - Show which question was added to the file
-   - Tell the user to open `in-progress/[filename]` and write their answer in the file
-   - Tell the user to run `/resumate.refine @파일명` again after answering
+Run the CLI with `--prompt` to get draft analysis:
 
-3. **STOP here. Do NOT continue the conversation.**
-   - Do NOT ask the user questions in chat
-   - Do NOT try to collect answers through conversation
-   - The entire Q&A happens through FILE EDITING, not chat
+```bash
+resumate refine $ARGUMENTS --prompt
+```
+
+Parse the JSON output. It will have one of two statuses:
+
+### Step 2a: If status is "sufficient"
+
+The draft already contains all key information. Tell the user:
+
+> "이 초안에는 이미 충분한 정보가 포함되어 있습니다. (This draft already contains sufficient information.)"
+
+Ask the user if they want deeper follow-up questions. If yes, run:
+
+```bash
+resumate refine $ARGUMENTS --prompt --deep
+```
+
+Then proceed to Step 3 with the new output.
+
+If the user declines, suggest running `resumate archive $ARGUMENTS` to proceed to the final structured format.
+
+### Step 2b: If status is "needs-questions"
+
+Proceed to Step 3.
+
+### Step 3: Generate questions from the prompt
+
+Read the `prompt` field from the JSON output. Follow the instructions in the prompt to generate questions.
+
+Output your response as a JSON array with this exact format:
+```json
+[
+  {"field": "<field_id>", "question": "<question_text>", "reason": "<why_this_is_needed>"}
+]
+```
+
+Use only the field identifiers listed in `metadata.fieldIdentifiers`. Generate at most `metadata.maxQuestions` questions.
+
+### Step 4: Write questions to the draft
+
+Run the CLI with `--questions` to write the generated questions:
+
+```bash
+resumate refine $ARGUMENTS --questions '<your_generated_json>'
+```
+
+### Step 5: Relay the result to the user
+
+- Show which questions were added to the file
+- Tell the user to open the draft file and write their answers
+- Tell the user to run `/resumate.refine $ARGUMENTS` again after answering
+
+### Fallback
+
+If **any step fails** (CLI error, JSON parsing failure, etc.), fall back to the standard hardcoded flow:
+
+```bash
+resumate refine $ARGUMENTS
+```
+
+Then relay the CLI output to the user as in the standard flow.
 
 ## Important
 
-- **MUST** use `resumate refine` CLI command — do NOT move files or edit Q&A sections manually
-- **MUST** stop after relaying the CLI output — this is a ONE-TURN skill
+- **MUST** use `resumate refine` CLI command — do NOT edit Q&A sections manually
+- **MUST** stop after relaying the result — this is a ONE-TURN skill
 - The workflow is: run skill → user edits file → run skill again → repeat
-- The CLI handles: file location, file movement, Q&A formatting, completion detection
+- The CLI handles: file location, Q&A formatting, completion detection
