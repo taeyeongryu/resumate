@@ -45,3 +45,103 @@ export interface ArchivedExperience {
   createdAt: Date;
   archivedAt: Date;
 }
+
+export type VersionType = 'draft' | 'refined' | 'archived';
+
+export interface ExperienceDirectory {
+  path: string;
+  name: string;
+  date: Date;
+  slug: string;
+  versions: {
+    draft: boolean;
+    refined: boolean;
+    archived: boolean;
+  };
+  timestamps: {
+    draft?: Date;
+    refined?: Date;
+    archived?: Date;
+  };
+}
+
+export interface ExperienceVersion {
+  type: VersionType;
+  filepath: string;
+  experienceDir: string;
+  metadata: {
+    createdAt: Date;
+    modifiedAt: Date;
+    sizeBytes: number;
+  };
+  frontmatter: Record<string, unknown>;
+  content: string;
+}
+
+export interface ExperienceContent {
+  title: string;
+  company: string;
+  role: string;
+  description?: string;
+  date?: string;
+}
+
+export interface MigrationManifest {
+  migrationId: string;
+  startedAt: string;
+  completedAt?: string;
+  phase: 'scanning' | 'grouping' | 'validating' | 'converting' | 'verifying' | 'cleanup' | 'completed' | 'failed';
+  progress: {
+    filesScanned: number;
+    filesTotal: number;
+    experiencesCreated: number;
+    experiencesTotal: number;
+  };
+  experiences: MigrationExperienceMapping[];
+  errors: MigrationError[];
+  config: {
+    rootDir: string;
+    backupDir: string;
+    dryRun: boolean;
+  };
+}
+
+export interface MigrationExperienceMapping {
+  experienceDir: string;
+  sourceFiles: {
+    draft?: string;
+    refined?: string;
+    archived?: string;
+  };
+  status: 'pending' | 'in-progress' | 'completed' | 'failed';
+  error?: string;
+  checksums?: {
+    draft?: string;
+    refined?: string;
+    archived?: string;
+  };
+}
+
+export interface MigrationError {
+  phase: string;
+  filepath?: string;
+  message: string;
+  timestamp: string;
+}
+
+export interface ExperienceQuery {
+  query: string;
+  type: 'exact-date' | 'partial-date' | 'slug-keyword' | 'text-match';
+  components: {
+    year?: number;
+    month?: number;
+    day?: number;
+    keywords?: string[];
+  };
+}
+
+export interface ExperienceSearchResult {
+  experience: ExperienceDirectory;
+  score: number;
+  matchReason: string;
+}

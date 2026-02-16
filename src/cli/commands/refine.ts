@@ -1,99 +1,94 @@
 import { createConfig } from '../../models/config.js';
-import { validateResumateInitialized, normalizeFilename } from '../utils/validation.js';
-import { readFile, writeFile, listFiles } from '../../services/file-manager.js';
+import { validateResumateInitialized } from '../utils/validation.js';
+import { ExperienceManager } from '../../services/experience-manager.js';
+import { ExperienceLocator } from '../../services/experience-locator.js';
+import { readFile, writeFile } from '../../services/file-manager.js';
 import { extractQASection, parseQAPairs } from '../../services/markdown-processor.js';
-import { locateFile, moveToInProgress } from '../../services/workflow-manager.js';
 import { questionTemplates, isCompletionSignal } from '../../templates/ai-prompts.js';
 import { getNextUnansweredQuestion, buildInitialQASection, formatQASection } from '../utils/prompts.js';
+import path from 'node:path';
 
-export async function refineCommand(filenameArg: string): Promise<void> {
+export async function refineCommand(query: string): Promise<void> {
   const rootDir = process.cwd();
   const config = createConfig(rootDir);
 
   if (!(await validateResumateInitialized(rootDir))) {
-    console.error('Error: Resumate not initialized.');
-    console.error('Run `resumate init <projectname>` first.');
-    process.exit(1);
-  }
-
-  const filename = normalizeFilename(filenameArg);
-  const { location, filepath } = await locateFile(filename, config);
-
-  if (location === 'not-found') {
-    const drafts = await listFiles(config.draftsDir, '.md');
-    const inProgress = await listFiles(config.inProgressDir, '.md');
-    console.error('Error: File not found.');
-    if (drafts.length > 0) console.error(`  Available in drafts/: ${drafts.join(', ')}`);
-    if (inProgress.length > 0) console.error(`  Available in in-progress/: ${inProgress.join(', ')}`);
-    process.exit(1);
-  }
-
-  if (location === 'archive') {
-    console.error(`This experience is already archived.`);
-    console.error(`  Location: archive/${filename}`);
+    console.error('✗ Error: Not a Resumate project');
+    console.error('');
+    console.error("  Run 'resumate init' first to initialize the project.");
     process.exit(1);
   }
 
   try {
-    let currentPath = filepath;
+    const manager = new ExperienceManager(config);
+    const locator = new ExperienceLocator(config);
 
-    // Move from drafts to in-progress if needed
-    if (location === 'drafts') {
-      currentPath = await moveToInProgress(filepath, filename, config);
-      console.log(`Moved ${filename} from drafts/ to in-progress/`);
+    // Use ExperienceLocator for flexible search
+    const experience = await locator.findOne(query);
+
+    // Check if draft exists
+    if (!experience.versions.draft) {
+      console.error(`✗ Error: No draft found for experience: ${experience.name}`);
+      console.error('');
+      console.error(`  Expected: experiences/${experience.name}/draft.md`);
+      process.exit(1);
     }
 
-    const content = await readFile(currentPath);
+    // Check if already refined
+    if (experience.versions.refined) {
+      console.error(`✗ Error: Experience already has refined version: ${experience.name}`);
+      console.error('');
+      console.error(`  Location: experiences/${experience.name}/refined.md`);
+      console.error('');
+      console.error('  Options:');
+      console.error('    • Edit refined.md directly in your editor');
+      console.error("    • Delete refined.md and run 'resumate refine' again to recreate");
+      process.exit(1);
+    }
+
+    console.log(`Found experience: ${experience.name}`);
+
+    // Read draft content and work with Q&A refinement
+    const draftPath = path.join(experience.path, 'draft.md');
+    const content = await readFile(draftPath);
     const qaResult = extractQASection(content);
 
     if (!qaResult) {
-      // First refinement - add Q&A section
+      // First refinement - add Q&A section to draft
       const firstQuestion = questionTemplates[0];
       const qaSection = buildInitialQASection(firstQuestion);
-      await writeFile(currentPath, content.trimEnd() + '\n' + qaSection + '\n');
+      await writeFile(draftPath, content.trimEnd() + '\n' + qaSection + '\n');
 
       console.log('');
       console.log("Let's refine this experience through a few questions.");
-      console.log('You can answer by editing the file directly or typing here.');
       console.log('');
       console.log(`Q: ${firstQuestion.korean}`);
       console.log(`   (${firstQuestion.english})`);
       console.log('');
-      console.log(`After adding your answer, run: /resumate refine @${filename.replace('.md', '')}`);
+      console.log(`After adding your answer, run: resumate refine ${experience.name}`);
     } else {
-      // Continue refinement - parse existing Q&A
+      // Continue refinement
       const qaPairs = parseQAPairs(qaResult.qaSection);
 
-      // Check for completion signal in last answer
+      // Check for completion
       const lastPair = qaPairs[qaPairs.length - 1];
       if (lastPair?.answer && isCompletionSignal(lastPair.answer)) {
-        console.log('');
-        console.log('Refinement complete!');
-        console.log('');
-        const answeredCount = qaPairs.filter((p) => p.answer).length;
-        console.log(`Your experience has been refined with ${answeredCount} answered questions.`);
-        console.log('');
-        console.log('Ready to archive? Run:');
-        console.log(`  /resumate archive ${filename.replace('.md', '')}`);
+        await createRefinedVersion(manager, experience.name, content);
         return;
       }
 
       const nextQuestion = getNextUnansweredQuestion(qaPairs);
 
       if (!nextQuestion) {
-        // All questions answered
-        console.log('');
-        console.log('All refinement questions have been answered!');
-        console.log('');
-        console.log('Ready to archive? Run:');
-        console.log(`  /resumate archive ${filename.replace('.md', '')}`);
+        // All questions answered - create refined version
+        await createRefinedVersion(manager, experience.name, content);
         return;
       }
 
-      // Append next question to file
+      // Append next question
       const updatedQA = formatQASection(qaPairs, nextQuestion);
       const newContent = qaResult.originalContent + '\n\n---\n\n' + updatedQA + '\n';
-      await writeFile(currentPath, newContent);
+      await writeFile(draftPath, newContent);
 
       console.log('');
       console.log('Continuing refinement...');
@@ -101,11 +96,28 @@ export async function refineCommand(filenameArg: string): Promise<void> {
       console.log(`Q: ${nextQuestion.korean}`);
       console.log(`   (${nextQuestion.english})`);
       console.log('');
-      console.log(`After adding your answer, run: /resumate refine @${filename.replace('.md', '')}`);
+      console.log(`After adding your answer, run: resumate refine ${experience.name}`);
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`Error during refinement: ${message}`);
+    console.error(`✗ Error: ${message}`);
     process.exit(1);
   }
+}
+
+async function createRefinedVersion(
+  manager: ExperienceManager,
+  dirName: string,
+  fullContent: string,
+): Promise<void> {
+  await manager.addRefinedVersion(dirName, fullContent);
+
+  console.log('');
+  console.log(`✓ Created refined version: experiences/${dirName}/refined.md`);
+  console.log('');
+  console.log(`  Preserved draft: experiences/${dirName}/draft.md`);
+  console.log('');
+  console.log('  Next steps:');
+  console.log('    • Review the refined version');
+  console.log(`    • Run 'resumate archive ${dirName}' to create final structured version`);
 }

@@ -51,10 +51,8 @@ export async function initCommand(projectname: string): Promise<void> {
     // Create .resumate/ for metadata
     await ensureDirectory(config.resumateDir);
 
-    // Create root-level data directories
-    await ensureDirectory(config.draftsDir);
-    await ensureDirectory(config.inProgressDir);
-    await ensureDirectory(config.archiveDir);
+    // Create experiences/ directory (new structure)
+    await ensureDirectory(config.experiencesDir);
     console.log(`Created directory structure in ${projectname}/`);
 
     // Install Claude Code skills
@@ -67,14 +65,16 @@ export async function initCommand(projectname: string): Promise<void> {
     console.log('Directory structure:');
     console.log(`  ${projectname}/`);
     console.log('  ├── .resumate/         # metadata');
-    console.log('  ├── drafts/            # experience drafts');
-    console.log('  ├── in-progress/       # refinement in progress');
-    console.log('  └── archive/           # structured archive');
+    console.log('  ├── experiences/       # experience entries');
+    console.log('  └── .claude/           # AI commands (optional)');
     console.log('');
     console.log('Next steps:');
     console.log(`  1. cd ${projectname}`);
     console.log('  2. Open Claude Code: claude');
-    console.log('  3. Add a new experience: resumate add');
+    console.log('  3. Add a new experience: resumate add --interactive');
+    console.log('');
+    console.log('For existing projects with old structure:');
+    console.log('  • Run \'resumate migrate\' to convert');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Error initializing Resumate: ${message}`);

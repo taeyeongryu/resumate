@@ -1,18 +1,30 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import fs from 'fs-extra';
-import { createConfig } from '../../src/models/config.js';
 import { writeFile, readFile, fileExists } from '../../src/services/file-manager.js';
 import { ensureDirectory } from '../../src/services/file-manager.js';
-import { generateUniqueFilename } from '../../src/services/slug-generator.js';
 import { extractTitle, extractQASection, parseQAPairs, parseMarkdown, stringifyMarkdown } from '../../src/services/markdown-processor.js';
 import { locateFile, moveToInProgress, moveToArchive } from '../../src/services/workflow-manager.js';
 import { buildInitialQASection, formatQASection, getAnsweredFields, getNextUnansweredQuestion } from '../../src/cli/utils/prompts.js';
 import { questionTemplates } from '../../src/templates/ai-prompts.js';
 import { parseDurationFromText, generateTags, parseList } from '../../src/cli/utils/validation.js';
-import { generateUniqueDateFilename } from '../../src/cli/commands/add.js';
+import { generateUniqueFilename } from '../../src/services/slug-generator.js';
 
 const TEST_DIR = path.join(process.cwd(), 'tmp', 'test-integration');
+
+// Legacy directory paths for old workflow tests
+const DRAFTS_DIR = path.join(TEST_DIR, 'drafts');
+const IN_PROGRESS_DIR = path.join(TEST_DIR, 'in-progress');
+const ARCHIVE_DIR = path.join(TEST_DIR, 'archive');
+
+const legacyConfig = {
+  rootDir: TEST_DIR,
+  resumateDir: path.join(TEST_DIR, '.resumate'),
+  draftsDir: DRAFTS_DIR,
+  inProgressDir: IN_PROGRESS_DIR,
+  archiveDir: ARCHIVE_DIR,
+  claudeCommandsDir: path.join(TEST_DIR, '.claude', 'commands'),
+};
 
 beforeEach(async () => {
   await fs.remove(TEST_DIR);
@@ -22,25 +34,18 @@ afterEach(async () => {
   await fs.remove(TEST_DIR);
 });
 
-describe('Full workflow: add → refine → archive', () => {
+describe('Full workflow: add → refine → archive (legacy)', () => {
   it('should complete the full experience structuring pipeline', async () => {
-    // 1. Init: create directory structure (root-level data dirs + .resumate for metadata)
-    const config = createConfig(TEST_DIR);
-    await ensureDirectory(config.resumateDir);
-    await ensureDirectory(config.draftsDir);
-    await ensureDirectory(config.inProgressDir);
-    await ensureDirectory(config.archiveDir);
+    // 1. Init: create directory structure (legacy layout)
+    await ensureDirectory(legacyConfig.resumateDir);
+    await ensureDirectory(DRAFTS_DIR);
+    await ensureDirectory(IN_PROGRESS_DIR);
+    await ensureDirectory(ARCHIVE_DIR);
 
-    // Verify root-level layout
-    expect(config.draftsDir).toBe(path.join(TEST_DIR, 'drafts'));
-    expect(config.inProgressDir).toBe(path.join(TEST_DIR, 'in-progress'));
-    expect(config.archiveDir).toBe(path.join(TEST_DIR, 'archive'));
-    expect(config.resumateDir).toBe(path.join(TEST_DIR, '.resumate'));
-
-    // 2. Add: create empty date-based file in drafts/
-    const dateFilename = await generateUniqueDateFilename('2024-06-15', config.draftsDir);
-    expect(dateFilename).toBe('2024-06-15.md');
-    const draftPath = path.join(config.draftsDir, dateFilename);
+    // 2. Add: create file in drafts/
+    const dateFilename = await generateUniqueFilename('test-experience', DRAFTS_DIR, new Date('2024-06-15'));
+    expect(dateFilename).toBe('2024-06-15-test-experience.md');
+    const draftPath = path.join(DRAFTS_DIR, dateFilename);
     await writeFile(draftPath, '');
 
     // User edits the file with content
@@ -51,19 +56,17 @@ describe('Full workflow: add → refine → archive', () => {
     expect(title).toBe('Built a REST API with Node.js');
 
     // Verify draft exists
-    const located = await locateFile(dateFilename, config);
+    const located = await locateFile(dateFilename, legacyConfig);
     expect(located.location).toBe('drafts');
 
     // 3. Refine: move to in-progress and add Q&A
-    const inProgressPath = await moveToInProgress(draftPath, dateFilename, config);
+    const inProgressPath = await moveToInProgress(draftPath, dateFilename, legacyConfig);
     let content = await readFile(inProgressPath);
 
-    // Add initial Q&A section (first question: duration)
     const initialQA = buildInitialQASection(questionTemplates[0]);
     content += initialQA;
     await writeFile(inProgressPath, content);
 
-    // Verify Q&A was added
     const qa1 = extractQASection(content);
     expect(qa1).not.toBeNull();
     expect(qa1!.qaSection).toContain('## AI Refinement Questions');
@@ -75,7 +78,6 @@ describe('Full workflow: add → refine → archive', () => {
     );
     await writeFile(inProgressPath, content);
 
-    // Parse answers and add next question
     const qa2 = extractQASection(content)!;
     const pairs = parseQAPairs(qa2.qaSection);
     expect(pairs).toHaveLength(1);
@@ -88,12 +90,10 @@ describe('Full workflow: add → refine → archive', () => {
     expect(nextQ).not.toBeNull();
     expect(nextQ!.field).toBe('achievements');
 
-    // Add the next question and simulate answer
     const updatedQA = formatQASection(pairs, nextQ!);
     content = qa2.originalContent + '\n\n---\n\n' + updatedQA;
-    // Answer achievements
     content = content.replace(
-      /(\*\*A\*\*: _\[Please provide your answer\]_)(?![\s\S]*\*\*A\*\*)/, // first placeholder
+      /(\*\*A\*\*: _\[Please provide your answer\]_)(?![\s\S]*\*\*A\*\*)/,
       '**A**: - API 응답 시간 50% 개선\n- 일일 요청 100만 건 처리',
     );
     await writeFile(inProgressPath, content);
@@ -103,18 +103,15 @@ describe('Full workflow: add → refine → archive', () => {
     const duration = parseDurationFromText(durationAnswer);
     expect(duration).toEqual({ start: '2024-01-01', end: '2024-06-30' });
 
-    // Parse technologies
     const techText = 'Express, TypeScript, Redis, PostgreSQL';
     const technologies = parseList(techText);
     expect(technologies).toEqual(['Express', 'TypeScript', 'Redis', 'PostgreSQL']);
 
-    // Generate tags
     const tags = generateTags(technologies);
     expect(tags).toContain('backend');
     expect(tags).toContain('typescript');
     expect(tags).toContain('database');
 
-    // Build frontmatter
     const frontmatter = {
       title,
       date: '2024-06-15',
@@ -128,7 +125,6 @@ describe('Full workflow: add → refine → archive', () => {
     const body = `## Detailed Context\n\n${qa3.originalContent.replace(/^#\s+.+\n/, '').trim()}`;
     const archiveContent = stringifyMarkdown(body, frontmatter);
 
-    // Verify YAML frontmatter in output
     const parsed = parseMarkdown(archiveContent);
     expect(parsed.data.title).toBe('Built a REST API with Node.js');
     expect(parsed.data.date).toBe('2024-06-15');
@@ -137,11 +133,11 @@ describe('Full workflow: add → refine → archive', () => {
     expect(parsed.data.tags).toContain('backend');
 
     // Move to archive
-    const archivePath = await moveToArchive(inProgressPath, dateFilename, config);
+    const archivePath = await moveToArchive(inProgressPath, dateFilename, legacyConfig);
     await writeFile(archivePath, archiveContent);
 
     // Verify final state
-    expect(await fileExists(path.join(config.inProgressDir, dateFilename))).toBe(false);
+    expect(await fileExists(path.join(IN_PROGRESS_DIR, dateFilename))).toBe(false);
     expect(await fileExists(archivePath)).toBe(true);
 
     const finalContent = await readFile(archivePath);
@@ -149,24 +145,23 @@ describe('Full workflow: add → refine → archive', () => {
     expect(finalContent).toContain('## Detailed Context');
   });
 
-  it('should handle date filename collisions in add workflow', async () => {
-    const config = createConfig(TEST_DIR);
-    await ensureDirectory(config.draftsDir);
+  it('should handle filename collisions in legacy workflow', async () => {
+    await ensureDirectory(DRAFTS_DIR);
 
     // Create first file
-    const filename1 = await generateUniqueDateFilename('2024-06-15', config.draftsDir);
-    expect(filename1).toBe('2024-06-15.md');
-    await writeFile(path.join(config.draftsDir, filename1), '');
+    const filename1 = await generateUniqueFilename('test', DRAFTS_DIR, new Date('2024-06-15'));
+    expect(filename1).toBe('2024-06-15-test.md');
+    await writeFile(path.join(DRAFTS_DIR, filename1), '');
 
     // Create second file — should get -1 suffix
-    const filename2 = await generateUniqueDateFilename('2024-06-15', config.draftsDir);
-    expect(filename2).toBe('2024-06-15-1.md');
-    await writeFile(path.join(config.draftsDir, filename2), '');
+    const filename2 = await generateUniqueFilename('test', DRAFTS_DIR, new Date('2024-06-15'));
+    expect(filename2).toBe('2024-06-15-test-1.md');
+    await writeFile(path.join(DRAFTS_DIR, filename2), '');
 
     // Both files should be locatable
-    const result1 = await locateFile(filename1, config);
+    const result1 = await locateFile(filename1, legacyConfig);
     expect(result1.location).toBe('drafts');
-    const result2 = await locateFile(filename2, config);
+    const result2 = await locateFile(filename2, legacyConfig);
     expect(result2.location).toBe('drafts');
   });
 });

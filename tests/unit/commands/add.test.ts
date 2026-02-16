@@ -1,42 +1,51 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'node:path';
 import fs from 'fs-extra';
-import { generateUniqueDateFilename } from '../../../src/cli/commands/add.js';
+import { createConfig } from '../../../src/models/config.js';
+import { ExperienceManager } from '../../../src/services/experience-manager.js';
+import { generateSlug, generateDatePrefix } from '../../../src/services/slug-generator.js';
 
 const TEST_DIR = path.join(process.cwd(), 'tmp', 'test-add');
 
 beforeEach(async () => {
   await fs.ensureDir(TEST_DIR);
+  const config = createConfig(TEST_DIR);
+  await fs.ensureDir(config.experiencesDir);
+  await fs.ensureDir(config.resumateDir);
 });
 
 afterEach(async () => {
   await fs.remove(TEST_DIR);
 });
 
-describe('generateUniqueDateFilename', () => {
-  it('should generate YYYY-MM-DD.md when no conflict', async () => {
-    const result = await generateUniqueDateFilename('2026-02-15', TEST_DIR);
-    expect(result).toBe('2026-02-15.md');
+describe('add command logic', () => {
+  it('should create experience directory with slug from title', async () => {
+    const config = createConfig(TEST_DIR);
+    const manager = new ExperienceManager(config);
+    const slug = generateSlug('React Performance Optimization');
+    expect(slug).toBe('react-performance-optimization');
+
+    const experience = await manager.createExperience(new Date('2024-06-15'), slug, {
+      title: 'React Performance Optimization', company: 'Corp', role: 'Dev',
+    });
+    expect(experience.name).toBe('2024-06-15-react-performance-optimization');
   });
 
-  it('should append -1 when base filename exists', async () => {
-    await fs.writeFile(path.join(TEST_DIR, '2026-02-15.md'), '');
-    const result = await generateUniqueDateFilename('2026-02-15', TEST_DIR);
-    expect(result).toBe('2026-02-15-1.md');
+  it('should use today date when no date provided', () => {
+    const datePrefix = generateDatePrefix();
+    expect(datePrefix).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it('should append -2 when base and -1 both exist', async () => {
-    await fs.writeFile(path.join(TEST_DIR, '2026-02-15.md'), '');
-    await fs.writeFile(path.join(TEST_DIR, '2026-02-15-1.md'), '');
-    const result = await generateUniqueDateFilename('2026-02-15', TEST_DIR);
-    expect(result).toBe('2026-02-15-2.md');
-  });
-
-  it('should increment counter for multiple collisions', async () => {
-    await fs.writeFile(path.join(TEST_DIR, '2026-02-15.md'), '');
-    await fs.writeFile(path.join(TEST_DIR, '2026-02-15-1.md'), '');
-    await fs.writeFile(path.join(TEST_DIR, '2026-02-15-2.md'), '');
-    const result = await generateUniqueDateFilename('2026-02-15', TEST_DIR);
-    expect(result).toBe('2026-02-15-3.md');
+  it('should reject duplicate experience directories', async () => {
+    const config = createConfig(TEST_DIR);
+    const manager = new ExperienceManager(config);
+    await manager.createExperience(new Date('2024-06-15'), 'test', {
+      title: 'Test', company: 'Corp', role: 'Dev',
+    });
+    await expect(
+      manager.createExperience(new Date('2024-06-15'), 'test', {
+        title: 'Test', company: 'Corp', role: 'Dev',
+      })
+    ).rejects.toThrow(/already exists/);
   });
 });

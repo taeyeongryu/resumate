@@ -5,6 +5,7 @@ import { initCommand, updateCommand } from './commands/init.js';
 import { addCommand } from './commands/add.js';
 import { refineCommand } from './commands/refine.js';
 import { archiveCommand } from './commands/archive.js';
+import { migrateCommand } from './commands/migrate.js';
 
 const program = new Command();
 
@@ -26,19 +27,34 @@ program
 
 program
   .command('add')
-  .description('Create a new empty experience draft with today\'s date')
+  .description('Create a new experience entry with draft.md')
+  .option('-t, --title <title>', 'Experience title')
+  .option('-c, --company <company>', 'Company name')
+  .option('-r, --role <role>', 'Job role')
+  .option('-d, --date <date>', 'Experience date (YYYY-MM-DD, default: today)')
+  .option('--slug <slug>', 'Custom slug (default: auto-generated from title)')
   .action(addCommand);
 
 program
   .command('refine')
-  .argument('<filename>', 'Filename of draft to refine (with or without @)')
-  .description('Refine a draft through AI-guided conversation')
+  .argument('<query>', 'Experience to refine (directory name or search query)')
+  .description('Refine an experience through AI-guided Q&A')
   .action(refineCommand);
 
 program
   .command('archive')
-  .argument('<filename>', 'Filename of refined experience to archive')
+  .argument('<query>', 'Experience to archive (directory name or search query)')
   .description('Convert refined experience to final structured format')
   .action(archiveCommand);
+
+program
+  .command('migrate')
+  .description('Convert old workflow-based structure to new experience-based structure')
+  .option('--dry-run', 'Preview migration without making changes')
+  .option('--cleanup', 'Remove old directories after successful migration')
+  .option('--resume <id>', 'Resume interrupted migration')
+  .option('--rollback <id>', 'Rollback partial migration')
+  .option('-y, --yes', 'Skip confirmation prompts')
+  .action(migrateCommand);
 
 program.parse();
