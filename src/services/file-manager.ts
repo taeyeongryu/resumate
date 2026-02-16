@@ -24,6 +24,10 @@ export async function fileExists(filepath: string): Promise<boolean> {
   return fs.pathExists(filepath);
 }
 
+export async function getFileStat(filepath: string): Promise<fs.Stats> {
+  return fs.stat(filepath);
+}
+
 export async function directoryExists(dirpath: string): Promise<boolean> {
   try {
     const stat = await fs.stat(dirpath);

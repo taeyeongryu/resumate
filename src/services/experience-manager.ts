@@ -8,6 +8,7 @@ import {
   readFile,
   fileExists,
   directoryExists,
+  getFileStat,
   validateExperienceDirName,
   parseExperienceDirName,
   listDirectories,
@@ -176,7 +177,7 @@ export class ExperienceManager {
     for (const version of ['draft', 'refined', 'archived'] as const) {
       if (versions[version]) {
         const filePath = path.join(dirPath, `${version}.md`);
-        const stat = await import('fs-extra').then(fs => fs.stat(filePath));
+        const stat = await getFileStat(filePath);
         timestamps[version] = stat.mtime;
       }
     }

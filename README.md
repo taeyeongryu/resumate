@@ -8,6 +8,12 @@
 npm install -g resumate
 ```
 
+macOS/Linux에서 권한 에러(`EACCES`)가 발생하면:
+
+```bash
+sudo npm install -g resumate
+```
+
 **필수 요건:** Node.js 18+, [Claude Code](https://claude.ai/code)
 
 ## 사용법
