@@ -145,3 +145,55 @@ export interface ExperienceSearchResult {
   score: number;
   matchReason: string;
 }
+
+// --- Dynamic Question Generation Types ---
+
+export enum ExperienceType {
+  TECHNICAL_PROJECT = 'technical-project',
+  LEADERSHIP = 'leadership',
+  LEARNING = 'learning',
+  JOB = 'job',
+  GENERAL = 'general',
+}
+
+export enum Language {
+  KOREAN = 'korean',
+  ENGLISH = 'english',
+  MIXED = 'mixed',
+}
+
+export interface FieldDetection {
+  field: string;
+  confidence: number;
+  evidence: string;
+}
+
+export interface DraftAnalysis {
+  presentFields: FieldDetection[];
+  missingFields: string[];
+  experienceType: ExperienceType;
+  language: Language;
+  draftContent: string;
+  frontmatter: Record<string, unknown>;
+  isSufficient: boolean;
+}
+
+export interface DynamicQuestion {
+  field: string;
+  question: string;
+  reason: string;
+}
+
+export interface PromptMetadata {
+  experienceDir: string;
+  maxQuestions: number;
+  outputFormat: string;
+  fieldIdentifiers: string[];
+}
+
+export interface PromptOutput {
+  status: 'needs-questions' | 'sufficient';
+  analysis: DraftAnalysis;
+  prompt: string;
+  metadata: PromptMetadata;
+}

@@ -71,3 +71,110 @@ export function getNextQuestion(
   }
   return null;
 }
+
+import type { DraftAnalysis, PromptOutput } from '../models/experience.js';
+import { ExperienceType } from '../models/experience.js';
+
+const TYPE_GUIDANCE: Record<string, string> = {
+  [ExperienceType.TECHNICAL_PROJECT]: `
+## Experience Type: Technical Project
+Focus questions on:
+- Architecture decisions and technical challenges
+- Performance metrics and measurable outcomes
+- Technical stack choices and trade-offs
+- Scalability considerations`,
+  [ExperienceType.LEADERSHIP]: `
+## Experience Type: Leadership/Management
+Focus questions on:
+- Team size, structure, and management approach
+- Business outcomes and organizational impact
+- People management and mentoring experiences
+- Stakeholder communication and decision-making`,
+  [ExperienceType.LEARNING]: `
+## Experience Type: Learning/Education
+Focus questions on:
+- What was learned and key skill development
+- Practical application of new knowledge
+- How the learning changed their approach or methodology
+- Certification or completion details`,
+  [ExperienceType.JOB]: `
+## Experience Type: Job/Position
+Focus questions on:
+- Scope of role and key responsibilities
+- Career progression and growth within the role
+- Impact on the team or organization
+- Key projects or initiatives led`,
+};
+
+export function generateQuestionPrompt(analysis: DraftAnalysis): string {
+  const presentList = analysis.presentFields
+    .map((f) => `- ${f.field}: "${f.evidence}"`)
+    .join('\n');
+  const missingList = analysis.missingFields.join(', ');
+  const maxQuestions = Math.min(analysis.missingFields.length, 6);
+
+  const languageInstruction =
+    analysis.language === 'korean'
+      ? 'Generate all questions in Korean.'
+      : analysis.language === 'english'
+        ? 'Generate all questions in English.'
+        : 'Generate questions in both Korean and English.';
+
+  const typeGuidance = TYPE_GUIDANCE[analysis.experienceType] ?? '';
+
+  return `Analyze the following experience draft and generate ${maxQuestions} clarifying questions about the missing information.
+
+## Draft Content
+${analysis.draftContent}
+
+## Already Present Information (DO NOT ask about these)
+${presentList || '(none detected)'}
+
+## Missing Information (generate questions for these)
+${missingList}
+${typeGuidance}
+
+## Instructions
+- ${languageInstruction}
+- Only ask about information that is NOT already present in the draft.
+- Make questions specific to the draft content, not generic.
+- Each question should help the user provide concrete, detailed information.
+- Output your response as a JSON array with exactly this format:
+  [{"field": "<field_id>", "question": "<question_text>", "reason": "<why_this_is_needed>"}]
+- Valid field identifiers: ${analysis.missingFields.join(', ')}
+- Maximum ${maxQuestions} questions.`;
+}
+
+export function buildPromptOutput(
+  analysis: DraftAnalysis,
+  experienceDir: string,
+): PromptOutput {
+  if (analysis.isSufficient) {
+    return {
+      status: 'sufficient',
+      analysis,
+      prompt: '',
+      metadata: {
+        experienceDir,
+        maxQuestions: 0,
+        outputFormat: 'json',
+        fieldIdentifiers: [],
+      },
+    };
+  }
+
+  const maxQuestions = Math.min(analysis.missingFields.length, 6);
+  const prompt = generateQuestionPrompt(analysis);
+
+  return {
+    status: 'needs-questions',
+    analysis,
+    prompt,
+    metadata: {
+      experienceDir,
+      maxQuestions,
+      outputFormat: 'json',
+      fieldIdentifiers: analysis.missingFields.slice(0, 6),
+    },
+  };
+}

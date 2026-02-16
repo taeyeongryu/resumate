@@ -1,5 +1,6 @@
 import { questionTemplates, type QuestionTemplate } from '../../templates/ai-prompts.js';
 import type { QAPair } from '../../services/markdown-processor.js';
+import type { DynamicQuestion } from '../../models/experience.js';
 
 export function getAnsweredFields(qaPairs: QAPair[]): string[] {
   const answered: string[] = [];
@@ -62,4 +63,44 @@ export function buildInitialQASection(firstQuestion: QuestionTemplate): string {
   section += `\n### Q: ${firstQuestion.korean}\n`;
   section += '**A**: _[Please provide your answer]_\n';
   return section;
+}
+
+const MAX_DYNAMIC_QUESTIONS = 6;
+
+export function buildBatchQASection(questions: DynamicQuestion[]): string {
+  let section = '\n---\n\n## AI Refinement Questions\n';
+  for (const q of questions) {
+    section += `\n### Q: ${q.question}\n`;
+    section += '**A**: _[Please provide your answer]_\n';
+  }
+  return section;
+}
+
+export function validateDynamicQuestions(jsonInput: string): DynamicQuestion[] {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(jsonInput);
+  } catch {
+    throw new Error('Invalid JSON: could not parse questions input');
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error('Questions must be a JSON array');
+  }
+
+  if (parsed.length > MAX_DYNAMIC_QUESTIONS) {
+    throw new Error(`Questions exceed maximum of ${MAX_DYNAMIC_QUESTIONS}`);
+  }
+
+  for (let i = 0; i < parsed.length; i++) {
+    const item = parsed[i] as Record<string, unknown>;
+    if (!item.field || typeof item.field !== 'string') {
+      throw new Error(`Question at index ${i} is missing required "field" property`);
+    }
+    if (!item.question || typeof item.question !== 'string') {
+      throw new Error(`Question at index ${i} is missing required "question" property`);
+    }
+  }
+
+  return parsed as DynamicQuestion[];
 }
