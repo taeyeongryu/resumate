@@ -41,6 +41,7 @@ program
   .option('--prompt', 'Output draft analysis and AI prompt as JSON (for Claude Code integration)')
   .option('--questions <json>', 'Accept AI-generated questions as JSON and write to draft')
   .option('--deep', 'Force deeper follow-up questions even when draft is sufficient')
+  .option('--complete', 'Create refined.md from draft content (marks refinement as complete)')
   .description('Refine an experience through AI-guided Q&A')
   .action(refineCommand);
 

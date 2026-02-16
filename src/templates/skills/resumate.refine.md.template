@@ -35,15 +35,25 @@ The draft already contains all key information. Tell the user:
 
 > "이 초안에는 이미 충분한 정보가 포함되어 있습니다. (This draft already contains sufficient information.)"
 
-Ask the user if they want deeper follow-up questions. If yes, run:
+Ask the user if they want to:
+1. **Proceed to archive** (recommended) — finalize the refinement and move to structuring
+2. **Go deeper** — generate additional follow-up questions for richer content
+
+**If the user wants to proceed to archive**, run the completion command to create `refined.md`:
+
+```bash
+resumate refine $ARGUMENTS --complete
+```
+
+Then tell the user the refined version has been created, and suggest running `/resumate.archive $ARGUMENTS` to proceed to the final structured format.
+
+**If the user wants deeper questions**, run:
 
 ```bash
 resumate refine $ARGUMENTS --prompt --deep
 ```
 
 Then proceed to Step 3 with the new output.
-
-If the user declines, suggest running `resumate archive $ARGUMENTS` to proceed to the final structured format.
 
 ### Step 2b: If status is "needs-questions"
 

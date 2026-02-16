@@ -13,6 +13,7 @@ export interface RefineOptions {
   prompt?: boolean;
   questions?: string;
   deep?: boolean;
+  complete?: boolean;
 }
 
 export async function refineCommand(query: string, options?: RefineOptions): Promise<void> {
@@ -56,6 +57,12 @@ export async function refineCommand(query: string, options?: RefineOptions): Pro
     const draftPath = path.join(experience.path, 'draft.md');
     const content = await readFile(draftPath);
 
+    // Handle --complete flag: create refined.md from draft content
+    if (options?.complete) {
+      await handleCompleteMode(content, experience.name, manager);
+      return;
+    }
+
     // Handle --prompt flag: analyze and output JSON
     if (options?.prompt) {
       await handlePromptMode(content, experience.name, options.deep);
@@ -92,6 +99,10 @@ async function handlePromptMode(content: string, experienceDir: string, deep?: b
 
   const output = buildPromptOutput(analysis, experienceDir);
   process.stdout.write(JSON.stringify(output));
+}
+
+async function handleCompleteMode(content: string, experienceName: string, manager: ExperienceManager): Promise<void> {
+  await createRefinedVersion(manager, experienceName, content);
 }
 
 async function handleQuestionsMode(content: string, draftPath: string, questionsJson: string): Promise<void> {
