@@ -10,6 +10,9 @@ import {
   directoryExists,
   listFiles,
   ensureDirectory,
+  validateExperienceDirName,
+  parseExperienceDirName,
+  listDirectories,
 } from '../../../src/services/file-manager.js';
 
 const TEST_DIR = path.join(process.cwd(), 'tmp', 'test-file-manager');
@@ -116,5 +119,81 @@ describe('ensureDirectory', () => {
     const nested = path.join(TEST_DIR, 'a', 'b', 'c');
     await ensureDirectory(nested);
     expect(await directoryExists(nested)).toBe(true);
+  });
+});
+
+describe('validateExperienceDirName', () => {
+  it('should accept valid directory names', () => {
+    expect(validateExperienceDirName('2024-06-15-react-optimization').valid).toBe(true);
+    expect(validateExperienceDirName('2024-01-01-my-project').valid).toBe(true);
+    expect(validateExperienceDirName('2025-12-31-a').valid).toBe(true);
+  });
+
+  it('should reject names without date prefix', () => {
+    const result = validateExperienceDirName('react-optimization');
+    expect(result.valid).toBe(false);
+  });
+
+  it('should reject names with invalid dates', () => {
+    const result = validateExperienceDirName('2024-13-45-test');
+    expect(result.valid).toBe(false);
+  });
+
+  it('should reject names with uppercase', () => {
+    const result = validateExperienceDirName('2024-06-15-React');
+    expect(result.valid).toBe(false);
+  });
+
+  it('should reject names with special characters', () => {
+    const result = validateExperienceDirName('2024-06-15-react_opt');
+    expect(result.valid).toBe(false);
+  });
+
+  it('should reject names longer than 100 characters', () => {
+    const longSlug = 'a'.repeat(90);
+    const result = validateExperienceDirName(`2024-06-15-${longSlug}`);
+    expect(result.valid).toBe(false);
+  });
+
+  it('should reject Windows reserved names as slug', () => {
+    const result = validateExperienceDirName('2024-06-15-con');
+    expect(result.valid).toBe(false);
+  });
+
+  it('should reject slugs starting or ending with hyphen', () => {
+    expect(validateExperienceDirName('2024-06-15--test').valid).toBe(false);
+    expect(validateExperienceDirName('2024-06-15-test-').valid).toBe(false);
+  });
+});
+
+describe('parseExperienceDirName', () => {
+  it('should parse valid directory names', () => {
+    const result = parseExperienceDirName('2024-06-15-react-optimization');
+    expect(result).toEqual({ date: '2024-06-15', slug: 'react-optimization' });
+  });
+
+  it('should parse single-word slugs', () => {
+    const result = parseExperienceDirName('2025-01-01-test');
+    expect(result).toEqual({ date: '2025-01-01', slug: 'test' });
+  });
+
+  it('should return null for invalid names', () => {
+    expect(parseExperienceDirName('not-a-valid-name')).toBeNull();
+    expect(parseExperienceDirName('2024-13-45-test')).toBeNull();
+  });
+});
+
+describe('listDirectories', () => {
+  it('should list only directories', async () => {
+    await ensureDirectory(path.join(TEST_DIR, 'dir1'));
+    await ensureDirectory(path.join(TEST_DIR, 'dir2'));
+    await writeFile(path.join(TEST_DIR, 'file.txt'), '');
+    const dirs = await listDirectories(TEST_DIR);
+    expect(dirs.sort()).toEqual(['dir1', 'dir2']);
+  });
+
+  it('should return empty array for non-existing directory', async () => {
+    const dirs = await listDirectories(path.join(TEST_DIR, 'nope'));
+    expect(dirs).toEqual([]);
   });
 });

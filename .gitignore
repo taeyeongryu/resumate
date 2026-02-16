@@ -46,3 +46,10 @@ coverage/
 # Environment
 .env
 .env.*
+
+# Playground (manual testing)
+playground/
+PLAYGROUND.md
+
+# Scripts (local development)
+scripts/

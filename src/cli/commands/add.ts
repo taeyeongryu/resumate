@@ -1,57 +1,59 @@
-import path from 'node:path';
 import { createConfig } from '../../models/config.js';
 import { validateResumateInitialized } from '../utils/validation.js';
-import { writeFile, directoryExists, fileExists } from '../../services/file-manager.js';
-import { generateDatePrefix } from '../../services/slug-generator.js';
+import { ExperienceManager } from '../../services/experience-manager.js';
+import { generateDatePrefix, generateSlug } from '../../services/slug-generator.js';
 
-export async function addCommand(): Promise<void> {
+export async function addCommand(options: {
+  title?: string;
+  company?: string;
+  role?: string;
+  date?: string;
+  slug?: string;
+}): Promise<void> {
   const rootDir = process.cwd();
   const config = createConfig(rootDir);
 
   if (!(await validateResumateInitialized(rootDir))) {
-    console.error('Error: Resumate not initialized.');
-    console.error('Run `resumate init <projectname>` first.');
+    console.error('✗ Error: Not a Resumate project');
+    console.error('');
+    console.error("  Run 'resumate init' first to initialize the project.");
     process.exit(1);
   }
 
-  if (!(await directoryExists(config.draftsDir))) {
-    console.error('Error: drafts/ directory not found.');
-    console.error('Run `resumate init <projectname>` to fix directory structure.');
-    process.exit(1);
-  }
+  const title = options.title || 'Untitled Experience';
+  const company = options.company || 'Unknown Company';
+  const role = options.role || 'Unknown Role';
+
+  const dateStr = options.date || generateDatePrefix();
+  const slug = options.slug || generateSlug(title);
 
   try {
-    const datePrefix = generateDatePrefix();
-    const filename = await generateUniqueDateFilename(datePrefix, config.draftsDir);
-    const filepath = path.join(config.draftsDir, filename);
+    const manager = new ExperienceManager(config);
+    const date = new Date(dateStr);
 
-    await writeFile(filepath, '');
+    if (isNaN(date.getTime())) {
+      console.error(`✗ Error: Invalid date format: ${dateStr}`);
+      console.error('');
+      console.error('  Expected format: YYYY-MM-DD (e.g., 2024-06-15)');
+      process.exit(1);
+    }
 
-    console.log('Draft created successfully!');
+    const experience = await manager.createExperience(date, slug, {
+      title,
+      company,
+      role,
+    });
+
+    console.log(`✓ Created experience: ${experience.name}`);
     console.log('');
-    console.log(`  File: drafts/${filename}`);
+    console.log(`  Location: experiences/${experience.name}/draft.md`);
     console.log('');
-    console.log('Next steps:');
-    console.log(`  1. Open drafts/${filename} and write your experience`);
-    console.log(`  2. Refine with AI: resumate refine ${filename}`);
+    console.log('  Next steps:');
+    console.log('    • Edit the draft in your editor');
+    console.log(`    • Run 'resumate refine ${dateStr}' when ready for Q&A`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`Error creating draft: ${message}`);
+    console.error(`✗ Error: ${message}`);
     process.exit(1);
   }
-}
-
-export async function generateUniqueDateFilename(datePrefix: string, directory: string): Promise<string> {
-  let filename = `${datePrefix}.md`;
-
-  if (!(await fileExists(path.join(directory, filename)))) {
-    return filename;
-  }
-
-  let counter = 1;
-  while (await fileExists(path.join(directory, `${datePrefix}-${counter}.md`))) {
-    counter++;
-  }
-
-  return `${datePrefix}-${counter}.md`;
 }
